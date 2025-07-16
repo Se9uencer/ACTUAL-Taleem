@@ -1,0 +1,54 @@
+# Node modules
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Production build output
+dist/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# TypeScript build output
+*.tsbuildinfo
+
+# Optional: Mac system files
+.AppleDouble
+.LSOverride
+
+# Optional: test coverage
+coverage/
+
+# Optional: local development tools
+*.local
+
+# Optional: next/image cache
+public/cache/
+
+# Optional: vercel
+.vercel/
+
+# Optional: storybook
+.storybook-out/

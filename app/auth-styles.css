@@ -1,0 +1,53 @@
+/* Auth pages light mode styles - Force light theme even in dark mode */
+.auth-page,
+html.dark .auth-page {
+  background-color: hsl(0 0% 100%) !important; /* Use background semantic color but force light */
+  color: hsl(0 0% 10%) !important; /* Use foreground semantic color but force light */
+}
+
+/* Force the form card to have a white background */
+.auth-page .card,
+html.dark .auth-page .card {
+  background-color: hsl(0 0% 100%) !important; /* Card background forced light */
+  color: hsl(0 0% 10%) !important; /* Card foreground forced light */
+}
+
+/* Force the main title (h2) to be black */
+.auth-page h2,
+html.dark .auth-page h2 {
+  color: hsl(0 0% 10%) !important; /* Foreground forced light */
+}
+
+/* General text styling for paragraphs and links on the page */
+.auth-page p,
+html.dark .auth-page p {
+  color: hsl(0 0% 45%) !important; /* Muted foreground forced light */
+}
+.auth-page a,
+html.dark .auth-page a {
+  color: hsl(270 50% 40%) !important; /* Primary color forced light */
+}
+.auth-page a:hover,
+html.dark .auth-page a:hover {
+  color: hsl(270 50% 35%) !important; /* Primary hover forced light */
+}
+
+/* Input field styling to ensure they are light */
+.auth-page input,
+.auth-page select,
+html.dark .auth-page input,
+html.dark .auth-page select {
+  background-color: hsl(0 0% 100%) !important; /* Background forced light */
+  border-color: hsl(0 0% 90%) !important; /* Border forced light */
+  color: hsl(0 0% 10%) !important; /* Foreground forced light */
+}
+
+.auth-page label,
+html.dark .auth-page label {
+  color: hsl(0 0% 10%) !important; /* Foreground forced light */
+}
+
+.auth-page input::placeholder,
+html.dark .auth-page input::placeholder {
+  color: hsl(0 0% 45%) !important; /* Muted foreground forced light */
+}
