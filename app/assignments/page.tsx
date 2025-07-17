@@ -317,6 +317,15 @@ export default function AssignmentsPage() {
     }
   }
 
+  // Helper to compute average verse accuracy to 2 decimal places
+  function getAverageVerseAccuracy(verseFeedback: any[] | undefined, fallback: number | undefined) {
+    if (Array.isArray(verseFeedback) && verseFeedback.length > 0) {
+      const avg = verseFeedback.reduce((sum, v) => sum + (typeof v.accuracy === 'number' ? v.accuracy : 0), 0) / verseFeedback.length;
+      return Math.round(avg * 10000) / 100; // 2 decimal places
+    }
+    return typeof fallback === 'number' ? Math.round(fallback * 10000) / 100 : 0;
+  }
+
   if (loading) {
     return (
       <AuthenticatedLayout>
@@ -493,11 +502,11 @@ export default function AssignmentsPage() {
                                     <div
                                       className="bg-primary h-2 rounded-full"
                                       style={{
-                                        width: `${Math.round(assignment.feedback.accuracy * 100)}%`,
+                                        width: `${getAverageVerseAccuracy(assignment.recitation?.verse_feedback, assignment.feedback.accuracy)}%`,
                                       }}
                                     ></div>
                                   </div>
-                                  <div className="ml-2 text-sm">{Math.round(assignment.feedback.accuracy * 100)}%</div>
+                                  <div className="ml-2 text-sm">{getAverageVerseAccuracy(assignment.recitation?.verse_feedback, assignment.feedback.accuracy)}%</div>
                                 </div>
                                 {assignment.feedback.notes && (
                                   <p className="text-sm text-muted-foreground">{assignment.feedback.notes}</p>

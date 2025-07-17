@@ -23,6 +23,7 @@ export default function NewAssignmentPage() {
     tomorrow.setDate(tomorrow.getDate() + 1)
     return tomorrow.toISOString().split("T")[0]
   })
+  const [dueTime, setDueTime] = useState("17:00") // Default to 5:00 PM
   const [classId, setClassId] = useState("")
   const [classes, setClasses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
@@ -258,7 +259,7 @@ export default function NewAssignmentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!surahName || !dueDate || !classId || selectedStudents.length === 0) {
+    if (!surahName || !dueDate || !dueTime || !classId || selectedStudents.length === 0) {
       setError("Please fill in all fields and select at least one student")
       return
     }
@@ -269,14 +270,13 @@ export default function NewAssignmentPage() {
       return
     }
 
-    // Validate due date is in the future
-    const selectedDate = new Date(dueDate)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to start of day for comparison
-
-    if (selectedDate <= today) {
-      setError("Due date must be in the future")
-      return
+    // Validate due date and time is in the future
+    const dueDateTimeString = `${dueDate}T${dueTime}:00`;
+    const selectedDateTime = new Date(dueDateTimeString);
+    const now = new Date();
+    if (selectedDateTime <= now) {
+      setError("Due date and time must be in the future")
+      return;
     }
 
     setSubmitting(true)
@@ -303,7 +303,7 @@ export default function NewAssignmentPage() {
           surah_name: surahName,
           start_ayah: startAyah,
           end_ayah: endAyah,
-          due_date: dueDate,
+          due_date: selectedDateTime.toISOString(),
           teacher_id: profile.id,
           class_id: classId,
         })
@@ -468,28 +468,26 @@ export default function NewAssignmentPage() {
                 <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
                   Due Date
                 </label>
-                <input
-                  type="date"
-                  id="dueDate"
-                  value={dueDate}
-                  min={getTomorrowDate()}
-                  onChange={(e) => {
-                    // Validate that the selected date is not in the past
-                    const selectedDate = new Date(e.target.value)
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0) // Reset time to start of day for comparison
-
-                    if (selectedDate <= today) {
-                      setError("Due date must be in the future")
-                    } else {
-                      setError(null)
-                      setDueDate(e.target.value)
-                    }
-                  }}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                  required
-                />
-                <p className="mt-1 text-xs text-gray-500">Due date must be at least tomorrow or later</p>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    id="dueDate"
+                    value={dueDate}
+                    min={getTomorrowDate()}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                    required
+                  />
+                  <input
+                    type="time"
+                    id="dueTime"
+                    value={dueTime}
+                    onChange={(e) => setDueTime(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                    required
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Due date and time must be in the future</p>
               </div>
 
               <div>

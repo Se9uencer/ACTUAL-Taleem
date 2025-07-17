@@ -15,6 +15,7 @@ import {
   MailIcon,
   PhoneIcon,
   CreditCardIcon as IdCardIcon,
+  AlertTriangle,
 } from "lucide-react"
 import AssignmentsList from "./assignments-list"
 
@@ -55,6 +56,8 @@ export default function ClassDetailsPage() {
   const [showExtraInfo, setShowExtraInfo] = useState<string | null>(null)
   const [studentAssignments, setStudentAssignments] = useState<StudentAssignment[]>([])
   const [loadingAssignments, setLoadingAssignments] = useState(false)
+  const [classStudentLinks, setClassStudentLinks] = useState<any[]>([])
+  const [missingProfiles, setMissingProfiles] = useState<any[]>([])
 
   const router = useRouter()
   const params = useParams()
@@ -124,40 +127,27 @@ export default function ClassDetailsPage() {
           }
         }
 
-        // First get all student IDs enrolled in this class
-        const { data: enrollments, error: enrollmentsError } = await client
+        // Get all class_students rows for this class, join with profiles (left join)
+        const { data: classStudents, error: classStudentsError } = await client
           .from("class_students")
-          .select("student_id")
+          .select("*, profiles:profiles(*)")
           .eq("class_id", classId)
 
-        if (enrollmentsError) {
-          console.error("Error fetching enrollments:", enrollmentsError)
+        if (classStudentsError) {
+          console.error("Error fetching class_students:", classStudentsError)
           setLoading(false)
           return
         }
 
-        if (!enrollments || enrollments.length === 0) {
-          setStudents([])
-          setLoading(false)
-          return
+        // Separate those with missing profiles
+        const missing = classStudents.filter((row: any) => !row.profiles)
+        if (missing.length > 0) {
+          console.warn(`Missing profiles for class_students:`, missing)
         }
-
-        // Get the student IDs
-        const studentIds = enrollments.map((enrollment) => enrollment.student_id)
-
-        // Now fetch the actual student profiles with more details
-        const { data: studentProfiles, error: profilesError } = await client
-          .from("profiles")
-          .select("id, email, first_name, last_name, role, grade, parent_email, parent_phone, student_id")
-          .in("id", studentIds)
-          .eq("role", "student")
-
-        if (profilesError) {
-          console.error("Error fetching student profiles:", profilesError)
-        } else {
-          setStudents(studentProfiles || [])
-        }
-
+        setMissingProfiles(missing)
+        setClassStudentLinks(classStudents)
+        // For backwards compatibility, setStudents to only those with profiles
+        setStudents(classStudents.filter((row: any) => row.profiles).map((row: any) => row.profiles))
         setLoading(false)
       } catch (err) {
         console.error("Error loading data:", err)
@@ -398,279 +388,218 @@ export default function ClassDetailsPage() {
           <div className="p-6">
             <div className="flex items-center mb-6">
               <UsersIcon className="h-5 w-5 text-gray-500 mr-2" />
-              <h3 className="text-lg font-medium text-gray-900">Students ({students.length})</h3>
+              <h3 className="text-lg font-medium text-gray-900">Students ({classStudentLinks.length})</h3>
             </div>
-
-            {students.length > 0 ? (
+            {missingProfiles.length > 0 && (
+              <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 flex items-center text-yellow-800 rounded">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                {missingProfiles.length} student(s) have missing or invalid profiles. Please check your database integrity.
+              </div>
+            )}
+            {classStudentLinks.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {students.map((student) => (
-                  <div key={student.id} className="border rounded-lg shadow-sm relative">
-                    {isTeacher && (
-                      <button
-                        onClick={() => setShowConfirmRemove(student.id)}
-                        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100"
-                        aria-label="Remove student"
-                      >
-                        <XIcon className="h-5 w-5" />
-                      </button>
-                    )}
-                    <div className="p-4">
-                      <div className="flex items-center mb-3">
-                        <div className="bg-purple-100 text-purple-600 p-2 rounded-full mr-3">
-                          <UserIcon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            {student.first_name} {student.last_name}
-                          </h4>
-                          <p className="text-sm text-gray-500">{student.email}</p>
-                        </div>
-                      </div>
-
-                      {/* Student ID display for teachers */}
-                      {isTeacher && student.student_id && (
-                        <div className="mb-3 flex items-center">
-                          <div className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-mono flex-grow">
-                            ID: {student.student_id}
+                {classStudentLinks.map((row) => {
+                  const profile = row.profiles
+                  return (
+                    <div key={row.student_id} className="border rounded-lg shadow-sm relative">
+                      {isTeacher && profile && (
+                        <button
+                          onClick={() => setShowConfirmRemove(profile.id)}
+                          className="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100"
+                          aria-label="Remove student"
+                        >
+                          <XIcon className="h-5 w-5" />
+                        </button>
+                      )}
+                      <div className="p-4">
+                        <div className="flex items-center mb-3">
+                          <div className="bg-purple-100 text-purple-600 p-2 rounded-full mr-3">
+                            <UserIcon className="h-5 w-5" />
                           </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900">
+                              {profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown user" : "Unknown user"}
+                            </h4>
+                            <p className="text-sm text-gray-500">{profile ? profile.email : row.student_id}</p>
+                          </div>
+                        </div>
+                        {/* Student ID display for teachers */}
+                        {isTeacher && profile && profile.student_id && (
+                          <div className="mb-3 flex items-center">
+                            <div className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-mono flex-grow">
+                              ID: {profile.student_id}
+                            </div>
+                            <button
+                              onClick={() => copyStudentId(profile.student_id!)}
+                              className="ml-1 p-1 text-gray-500 hover:text-purple-600 focus:outline-none"
+                              title="Copy student ID"
+                            >
+                              {copiedStudentId === profile.student_id ? (
+                                <CheckIcon className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <CopyIcon className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                        <div className="mt-4 flex space-x-2">
+                          {profile ? (
+                            <button
+                              onClick={() => handleViewProfile(profile.id)}
+                              className="flex-1 text-center px-3 py-1.5 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+                            >
+                              View Profile
+                            </button>
+                          ) : (
+                            <span className="flex-1 text-center px-3 py-1.5 bg-gray-200 text-gray-500 text-sm rounded cursor-not-allowed">No profile</span>
+                          )}
                           <button
-                            onClick={() => copyStudentId(student.student_id!)}
-                            className="ml-1 p-1 text-gray-500 hover:text-purple-600 focus:outline-none"
-                            title="Copy student ID"
+                            onClick={() => setShowExtraInfo(profile ? profile.id : row.student_id)}
+                            className="flex-1 text-center px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
                           >
-                            {copiedStudentId === student.student_id ? (
-                              <CheckIcon className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <CopyIcon className="h-4 w-4" />
-                            )}
+                            Contact Info
                           </button>
                         </div>
+                      </div>
+                      {/* Confirmation Modal for Removing Student */}
+                      {profile && showConfirmRemove === profile.id && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Remove Student</h3>
+                            <p className="text-gray-600 mb-6">
+                              Are you sure you want to remove {profile.first_name} {profile.last_name} from this class?
+                            </p>
+                            <div className="flex justify-end space-x-3">
+                              <button
+                                onClick={() => setShowConfirmRemove(null)}
+                                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleRemoveStudent(profile.id)}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       )}
-
-                      <div className="mt-4 flex space-x-2">
-                        <button
-                          onClick={() => handleViewProfile(student.id)}
-                          className="flex-1 text-center px-3 py-1.5 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
-                        >
-                          View Profile
-                        </button>
-                        <button
-                          onClick={() => setShowExtraInfo(student.id)}
-                          className="flex-1 text-center px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
-                        >
-                          Contact Info
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Confirmation Modal for Removing Student */}
-                    {showConfirmRemove === student.id && (
-                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                          <h3 className="text-lg font-medium text-gray-900 mb-4">Remove Student</h3>
-                          <p className="text-gray-600 mb-6">
-                            Are you sure you want to remove {student.first_name} {student.last_name} from this class?
-                          </p>
-                          <div className="flex justify-end space-x-3">
-                            <button
-                              onClick={() => setShowConfirmRemove(null)}
-                              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => handleRemoveStudent(student.id)}
-                              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Student Profile Modal */}
-                    {showStudentProfile === student.id && (
-                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                          <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-medium text-gray-900">
-                              {student.first_name} {student.last_name}'s Profile
-                            </h3>
-                            <button
-                              onClick={() => setShowStudentProfile(null)}
-                              className="text-gray-400 hover:text-gray-500"
-                            >
-                              <XIcon className="h-5 w-5" />
-                            </button>
-                          </div>
-
-                          {/* Student ID display in profile modal */}
-                          {isTeacher && student.student_id && (
-                            <div className="mb-4 p-3 bg-gray-50 rounded-md">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <IdCardIcon className="h-5 w-5 text-purple-600 mr-2" />
-                                  <h4 className="text-sm font-medium text-gray-700">Student ID</h4>
-                                </div>
-                                <div className="flex items-center">
-                                  <code className="bg-white px-3 py-1 rounded border text-purple-700 font-mono text-sm">
-                                    {student.student_id}
-                                  </code>
-                                  <button
-                                    onClick={() => copyStudentId(student.student_id!)}
-                                    className="ml-1 p-1 text-gray-500 hover:text-purple-600 focus:outline-none"
-                                    title="Copy student ID"
-                                  >
-                                    {copiedStudentId === student.student_id ? (
-                                      <CheckIcon className="h-4 w-4 text-green-500" />
-                                    ) : (
-                                      <CopyIcon className="h-4 w-4" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-500 mt-1">
-                                This ID can be shared with parents to link their accounts
-                              </p>
+                      {/* Student Profile Modal */}
+                      {profile && showStudentProfile === profile.id && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-4">
+                              <h3 className="text-xl font-medium text-gray-900">
+                                {profile.first_name} {profile.last_name}'s Profile
+                              </h3>
+                              <button
+                                onClick={() => setShowStudentProfile(null)}
+                                className="text-gray-400 hover:text-gray-500"
+                              >
+                                <XIcon className="h-5 w-5" />
+                              </button>
                             </div>
-                          )}
 
-                          <div className="mb-6">
-                            <h4 className="text-lg font-medium text-gray-800 mb-2 flex items-center">
-                              <BookOpenIcon className="h-5 w-5 mr-2 text-purple-600" />
-                              Assignments
-                            </h4>
-
-                            {loadingAssignments ? (
-                              <p className="text-gray-500 text-center py-4">Loading assignments...</p>
-                            ) : studentAssignments.length > 0 ? (
-                              <div className="space-y-3">
-                                {studentAssignments.map((assignment) => (
-                                  <div key={assignment.id} className="border rounded-lg p-3">
-                                    <div className="flex justify-between items-start">
-                                      <div>
-                                        <h5 className="font-medium">
-                                          {assignment.title ||
-                                            generateAssignmentTitle(
-                                              assignment.surah_name,
-                                              assignment.start_ayah,
-                                              assignment.end_ayah,
-                                            )}
-                                        </h5>
-                                        <p className="text-sm text-gray-600">
-                                          Due: {new Date(assignment.due_date).toLocaleDateString()}
-                                        </p>
-                                      </div>
-                                      <span
-                                        className={`text-sm px-2 py-1 rounded ${
-                                          assignment.submitted
-                                            ? "bg-green-100 text-green-800"
-                                            : new Date(assignment.due_date) < new Date()
-                                              ? "bg-red-100 text-red-800"
-                                              : "bg-yellow-100 text-yellow-800"
-                                        }`}
-                                      >
-                                        {assignment.submitted
-                                          ? "Submitted"
-                                          : new Date(assignment.due_date) < new Date()
-                                            ? "Overdue"
-                                            : "Pending"}
-                                      </span>
-                                    </div>
+                            {/* Student ID display in profile modal */}
+                            {isTeacher && profile.student_id && (
+                              <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <IdCardIcon className="h-5 w-5 text-purple-600 mr-2" />
+                                    <h4 className="text-sm font-medium text-gray-700">Student ID</h4>
                                   </div>
-                                ))}
+                                  <div className="flex items-center">
+                                    <code className="bg-white px-3 py-1 rounded border text-purple-700 font-mono text-sm">
+                                      {profile.student_id}
+                                    </code>
+                                    <button
+                                      onClick={() => copyStudentId(profile.student_id!)}
+                                      className="ml-1 p-1 text-gray-500 hover:text-purple-600 focus:outline-none"
+                                      title="Copy student ID"
+                                    >
+                                      {copiedStudentId === profile.student_id ? (
+                                        <CheckIcon className="h-4 w-4 text-green-500" />
+                                      ) : (
+                                        <CopyIcon className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  This ID can be shared with parents to link their accounts
+                                </p>
                               </div>
-                            ) : (
-                              <p className="text-gray-500 text-center py-4">No assignments found for this student.</p>
                             )}
-                          </div>
 
-                          <div className="flex justify-end">
-                            <button
-                              onClick={() => setShowStudentProfile(null)}
-                              className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-                            >
-                              Close
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                            <div className="mb-6">
+                              <h4 className="text-lg font-medium text-gray-800 mb-2 flex items-center">
+                                <BookOpenIcon className="h-5 w-5 mr-2 text-purple-600" />
+                                Assignments
+                              </h4>
 
-                    {/* Extra Info Modal */}
-                    {showExtraInfo === student.id && (
-                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                          <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">Contact Information</h3>
-                            <button
-                              onClick={() => setShowExtraInfo(null)}
-                              className="text-gray-400 hover:text-gray-500"
-                            >
-                              <XIcon className="h-5 w-5" />
-                            </button>
-                          </div>
-
-                          <div className="space-y-4">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Student Email</h4>
-                              <div className="flex items-center">
-                                <MailIcon className="h-4 w-4 text-gray-500 mr-2" />
-                                <a href={`mailto:${student.email}`} className="text-purple-600 hover:underline">
-                                  {student.email}
-                                </a>
-                              </div>
+                              {loadingAssignments ? (
+                                <p className="text-gray-500 text-center py-4">Loading assignments...</p>
+                              ) : studentAssignments.length > 0 ? (
+                                <div className="space-y-3">
+                                  {studentAssignments.map((assignment) => (
+                                    <div key={assignment.id} className="border rounded-lg p-3">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <h5 className="font-medium">
+                                            {assignment.title ||
+                                              generateAssignmentTitle(
+                                                assignment.surah_name,
+                                                assignment.start_ayah,
+                                                assignment.end_ayah,
+                                              )}
+                                          </h5>
+                                          <p className="text-sm text-gray-600">
+                                            Due: {new Date(assignment.due_date).toLocaleDateString()}
+                                          </p>
+                                        </div>
+                                        <span
+                                          className={`text-sm px-2 py-1 rounded ${
+                                            assignment.submitted
+                                              ? "bg-green-100 text-green-800"
+                                              : new Date(assignment.due_date) < new Date()
+                                                ? "bg-red-100 text-red-800"
+                                                : "bg-yellow-100 text-yellow-800"
+                                          }`}
+                                        >
+                                          {assignment.submitted
+                                            ? "Submitted"
+                                            : new Date(assignment.due_date) < new Date()
+                                              ? "Overdue"
+                                              : "Pending"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-gray-500 text-center py-4">No assignments found for this student.</p>
+                              )}
                             </div>
 
-                            {student.parent_email && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700 mb-1">Parent Email</h4>
-                                <div className="flex items-center">
-                                  <MailIcon className="h-4 w-4 text-gray-500 mr-2" />
-                                  <a
-                                    href={`mailto:${student.parent_email}`}
-                                    className="text-purple-600 hover:underline"
-                                  >
-                                    {student.parent_email}
-                                  </a>
-                                </div>
-                              </div>
-                            )}
-
-                            {student.parent_phone && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700 mb-1">Parent Phone</h4>
-                                <div className="flex items-center">
-                                  <PhoneIcon className="h-4 w-4 text-gray-500 mr-2" />
-                                  <a href={`tel:${student.parent_phone}`} className="text-purple-600 hover:underline">
-                                    {student.parent_phone}
-                                  </a>
-                                </div>
-                              </div>
-                            )}
-
-                            {!student.parent_email && !student.parent_phone && (
-                              <p className="text-gray-500 italic">No parent contact information available.</p>
-                            )}
-                          </div>
-
-                          <div className="mt-6 flex justify-end">
-                            <button
-                              onClick={() => setShowExtraInfo(null)}
-                              className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-                            >
-                              Close
-                            </button>
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => setShowStudentProfile(null)}
+                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                              >
+                                Close
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             ) : (
-              <p className="text-gray-500">No students enrolled yet.</p>
+              <p className="text-gray-500">No students enrolled in this class.</p>
             )}
           </div>
 
@@ -697,4 +626,26 @@ export default function ClassDetailsPage() {
       </main>
     </div>
   )
+}
+
+// DEV ONLY: Helper to validate class_students consistency
+if (process.env.NODE_ENV === "development") {
+  (window as any).validateClassStudents = async (classId: string) => {
+    const client = createClientComponentClient()
+    const { data: classStudents } = await client
+      .from("class_students")
+      .select("*, profiles:profiles(*)")
+      .eq("class_id", classId)
+    if (!classStudents) {
+      console.warn("[DEV] No class_students found for this class.")
+      return { classStudents: [], missing: [] }
+    }
+    const missing = classStudents.filter((row: any) => !row.profiles)
+    if (missing.length > 0) {
+      console.warn("[DEV] Missing profiles for class_students:", missing)
+    } else {
+      console.log("[DEV] All class_students have valid profiles.")
+    }
+    return { classStudents, missing }
+  }
 }

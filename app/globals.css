@@ -11,6 +11,27 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  @keyframes pulse-slower {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  @keyframes pulse-slowest {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .animate-pulse-slow {
+    animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .animate-pulse-slower {
+    animation: pulse-slower 7s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .animate-pulse-slowest {
+    animation: pulse-slowest 12s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 }
 
 @layer base {

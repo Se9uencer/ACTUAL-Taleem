@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
       if (assignmentsData && assignmentsData.length > 0) {
         // Get unique class IDs
-        const classIds = [...new Set(assignmentsData.map((a) => a.class_id).filter(Boolean))]
+        const classIds = [...new Set(assignmentsData.map((a: any) => a.class_id).filter(Boolean))]
 
         // Fetch class names
         const { data: classesData } = await supabase.from("classes").select("id, name").in("id", classIds)
@@ -110,7 +110,7 @@ export default function DashboardPage() {
         }, {})
 
         // Add class names to assignments
-        const formattedAssignments = assignmentsData.map((assignment) => ({
+        const formattedAssignments = assignmentsData.map((assignment: any) => ({
           ...assignment,
           class_name: assignment.class_id ? classMap[assignment.class_id] : undefined,
         }))
@@ -165,11 +165,24 @@ export default function DashboardPage() {
         .eq("student_id", userId)
 
       if (enrollmentsData && enrollmentsData.length > 0) {
-        const classIds = enrollmentsData.map((e) => e.class_id)
+        const classIds = enrollmentsData.map((e: any) => e.class_id)
 
         const { data: classesData } = await supabase.from("classes").select("*").in("id", classIds)
 
-        setClasses(classesData || [])
+        // For each class, fetch the student count (count of class_students rows)
+        const classesWithCounts = await Promise.all(
+          (classesData || []).map(async (classItem: any) => {
+            const { count } = await supabase
+              .from("class_students")
+              .select("*", { count: "exact", head: true })
+              .eq("class_id", classItem.id)
+            return {
+              ...classItem,
+              student_count: count || 0,
+            }
+          })
+        )
+        setClasses(classesWithCounts)
       } else {
         setClasses([])
       }
@@ -181,7 +194,7 @@ export default function DashboardPage() {
         .eq("student_id", userId)
 
       if (assignmentStudents && assignmentStudents.length > 0) {
-        const assignmentIds = assignmentStudents.map((item) => item.assignment_id)
+        const assignmentIds = assignmentStudents.map((item: any) => item.assignment_id)
 
         const { data: studentAssignments } = await supabase
           .from("assignments")
@@ -192,7 +205,7 @@ export default function DashboardPage() {
 
         if (studentAssignments && studentAssignments.length > 0) {
           // Get class names
-          const classIds = [...new Set(studentAssignments.map((a) => a.class_id).filter(Boolean))]
+          const classIds = [...new Set(studentAssignments.map((a: any) => a.class_id).filter(Boolean))]
 
           if (classIds.length > 0) {
             const { data: classesData } = await supabase.from("classes").select("id, name").in("id", classIds)
@@ -202,7 +215,7 @@ export default function DashboardPage() {
               return map
             }, {})
 
-            const formattedAssignments = studentAssignments.map((assignment) => ({
+            const formattedAssignments = studentAssignments.map((assignment: any) => ({
               ...assignment,
               class_name: assignment.class_id ? classMap[assignment.class_id] : undefined,
             }))
@@ -216,8 +229,8 @@ export default function DashboardPage() {
 
             const submittedAssignmentIds = new Set(latestRecitations?.map((r: any) => r.assignment_id) || [])
 
-            const pendingAssignments = []
-            const completed = []
+            const pendingAssignments: any[] = []
+            const completed: any[] = []
 
             for (const assignment of formattedAssignments || []) {
               if (submittedAssignmentIds.has(assignment.id)) {

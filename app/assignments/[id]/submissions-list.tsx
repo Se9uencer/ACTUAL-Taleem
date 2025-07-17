@@ -53,6 +53,15 @@ interface StudentSubmissions {
   has_submitted: boolean;
 }
 
+// Helper to compute average verse accuracy to 2 decimal places
+function getAverageVerseAccuracy(verseFeedback: any[] | undefined, fallback: number | undefined) {
+  if (Array.isArray(verseFeedback) && verseFeedback.length > 0) {
+    const avg = verseFeedback.reduce((sum, v) => sum + (typeof v.accuracy === 'number' ? v.accuracy : 0), 0) / verseFeedback.length;
+    return Math.round(avg * 10000) / 100; // 2 decimal places
+  }
+  return typeof fallback === 'number' ? Math.round(fallback * 10000) / 100 : 0;
+}
+
 export default function SubmissionsList({
   assignmentId,
   dueDate,
@@ -246,10 +255,10 @@ export default function SubmissionsList({
                               <div className="flex-1 bg-muted rounded-full h-2.5">
                                 <div
                                   className="bg-success h-2.5 rounded-full"
-                                  style={{ width: `${Math.round(student.latest_submission.feedback.accuracy * 100)}%` }}
+                                  style={{ width: `${getAverageVerseAccuracy(student.latest_submission.verse_feedback, student.latest_submission.feedback.accuracy)}%` }}
                                 ></div>
                               </div>
-                              <span className="font-semibold text-lg">{Math.round(student.latest_submission.feedback.accuracy * 100)}%</span>
+                              <span className="font-semibold text-lg">{getAverageVerseAccuracy(student.latest_submission.verse_feedback, student.latest_submission.feedback.accuracy)}%</span>
                             </div>
                           </div>
                         )}

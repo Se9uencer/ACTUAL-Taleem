@@ -156,6 +156,16 @@ export default function AssignmentFeedbackPage() {
     try { verseFeedback = JSON.parse(verseFeedback); } catch {}
   }
 
+  // Helper to compute average verse accuracy to 2 decimal places
+  function getAverageVerseAccuracy(verseFeedback: any[] | undefined, fallback: number | undefined) {
+    if (Array.isArray(verseFeedback) && verseFeedback.length > 0) {
+      const avg = verseFeedback.reduce((sum, v) => sum + (typeof v.accuracy === 'number' ? v.accuracy : 0), 0) / verseFeedback.length;
+      return Math.round(avg * 10000) / 100; // 2 decimal places
+    }
+    return typeof fallback === 'number' ? Math.round(fallback * 10000) / 100 : 0;
+  }
+  const avgAccuracy = getAverageVerseAccuracy(verseFeedback, feedback?.accuracy);
+
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 0.9) return "text-success"
     if (accuracy >= 0.7) return "text-info"
@@ -340,18 +350,18 @@ export default function AssignmentFeedbackPage() {
                         <div className="h-4 bg-muted rounded-full overflow-hidden">
                           <div
                             className="h-full bg-primary rounded-full"
-                            style={{ width: `${Math.round(feedback.accuracy * 100)}%` }}
+                            style={{ width: `${avgAccuracy}%` }}
                           ></div>
                         </div>
                       </div>
-                      <div className="text-2xl font-bold text-foreground">{Math.round(feedback.accuracy * 100)}%</div>
+                      <div className="text-2xl font-bold text-foreground">{avgAccuracy}%</div>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {feedback.accuracy >= 0.9
+                      {avgAccuracy >= 90
                         ? "Excellent! Your recitation is very accurate."
-                        : feedback.accuracy >= 0.7
+                        : avgAccuracy >= 70
                           ? "Good job! Your recitation is mostly accurate with a few areas for improvement."
-                          : feedback.accuracy >= 0.5
+                          : avgAccuracy >= 50
                             ? "Your recitation has some inaccuracies. Focus on the highlighted areas for improvement."
                             : "Your recitation needs significant improvement. Consider practicing more and trying again."}
                     </p>
