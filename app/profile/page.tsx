@@ -73,12 +73,12 @@ export default function ProfilePage() {
 
         setProfile(profileData)
         setFormData({
-          first_name: profileData.first_name || "",
-          last_name: profileData.last_name || "",
-          email: profileData.email || "",
-          grade: profileData.grade || "",
-          parent_email: profileData.parent_email || "",
-          parent_phone: profileData.parent_phone || "",
+          first_name: typeof profileData.first_name === 'string' ? profileData.first_name : "",
+          last_name: typeof profileData.last_name === 'string' ? profileData.last_name : "",
+          email: typeof profileData.email === 'string' ? profileData.email : "",
+          grade: typeof profileData.grade === 'string' ? profileData.grade : "",
+          parent_email: typeof profileData.parent_email === 'string' ? profileData.parent_email : "",
+          parent_phone: typeof profileData.parent_phone === 'string' ? profileData.parent_phone : "",
         })
       } catch (error: any) {
         console.error("Error loading profile:", error)

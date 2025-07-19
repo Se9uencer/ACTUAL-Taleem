@@ -52,3 +52,6 @@ public/cache/
 
 # Optional: storybook
 .storybook-out/
+
+# Sentry Config File
+.env.sentry-build-plugin

@@ -8,6 +8,7 @@ import { createClientComponentClient } from "@/lib/supabase/client"
 import { supabaseConfig } from "@/lib/config"
 import { PlusIcon, UsersIcon } from "lucide-react"
 import NewClassModal from "./new-class-modal"
+import { getStudentCountForClass } from '@/lib/supabase/client';
 
 // Define the Class type
 interface Class {
@@ -86,7 +87,7 @@ export default function ClassesPage() {
           throw new Error("Profile not found")
         }
 
-        setProfile(profileData)
+        setProfile(profileData as unknown as Profile);
 
         // Check if user is a teacher
         if (profileData.role !== "teacher") {
@@ -105,30 +106,18 @@ export default function ClassesPage() {
           throw new Error(`Failed to load classes: ${classesError.message}`)
         }
 
-        // For each class, get the student count
+        // For each class, get the student count using the helper
         const classesWithStudentCount = await Promise.all(
-          (classesData || []).map(async (classItem) => {
-            // Count students in the class_students junction table
-            const { count, error: countError } = await client
-              .from("class_students")
-              .select("*", { count: "exact", head: true })
-              .eq("class_id", classItem.id)
-
-            if (countError) {
-              console.error("Error counting students:", countError)
-              return { ...classItem, student_count: 0 }
-            }
-
+          ((classesData as unknown[] as Class[]) || []).map(async (classItem: Class) => {
+            const count = await getStudentCountForClass(client, classItem.id);
             return {
               ...classItem,
-              student_count: count || 0,
-            }
-          }),
-        )
-
-        setClasses(classesWithStudentCount)
+              student_count: count,
+            } as Class;
+          })
+        );
+        setClasses(classesWithStudentCount);
       } catch (error: any) {
-        console.error("Error loading data:", error)
         setError(error.message)
       } finally {
         setLoading(false)
@@ -199,7 +188,6 @@ export default function ClassesPage() {
       setClasses((prevClasses) => [{ ...data[0], student_count: 0 }, ...prevClasses])
       setIsModalOpen(false)
     } catch (error: any) {
-      console.error("Error creating class:", error)
       setError(`Failed to create class: ${error.message}`)
     } finally {
       setLoading(false)

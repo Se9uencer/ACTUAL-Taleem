@@ -22,9 +22,9 @@ import {
 } from "lucide-react"
 import { formatDatePST, isPastDuePST } from "@/lib/date-utils"
 import { RecitationAudioPlayer } from "@/components/recitation-audio-player";
+import { useCallback } from "react"
 
 export default function AssignmentsPage() {
-  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<any[]>([])
@@ -52,7 +52,6 @@ export default function AssignmentsPage() {
   // Fetch student assignments function
   const fetchStudentAssignments = async (supabase: any, userId: string) => {
     try {
-      console.log("Fetching assignments for student:", userId)
 
       // Step 1: Get all assignment IDs assigned to this student
       const { data: assignmentStudents, error: assignmentStudentsError } = await supabase
@@ -65,12 +64,10 @@ export default function AssignmentsPage() {
       }
 
       if (!assignmentStudents || assignmentStudents.length === 0) {
-        console.log("No assignments found for student")
         return []
       }
 
-      const assignmentIds = assignmentStudents.map((item) => item.assignment_id)
-      console.log(`Found ${assignmentIds.length} assignments for student:`, assignmentIds)
+      const assignmentIds = assignmentStudents.map((item: { assignment_id: string }) => item.assignment_id)
 
       // Step 2: Fetch full assignment details
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -94,8 +91,6 @@ export default function AssignmentsPage() {
         throw new Error(`Failed to load assignment details: ${assignmentsError.message}`)
       }
 
-      console.log(`Fetched ${assignmentsData?.length || 0} assignment details`)
-
       // Step 3: Fetch recitations (submissions) for these assignments
       // IMPORTANT: We're explicitly NOT using is_latest here to get ALL recitations
       // FIXED: Removed transcript from feedback selection as it doesn't exist
@@ -117,13 +112,11 @@ export default function AssignmentsPage() {
         // Continue even if there's an error fetching recitations
       }
 
-      console.log(`Fetched ${recitationsData?.length || 0} recitations`)
-
       // Step 4: Create a map of assignment IDs to recitations
       const recitationMap = new Map()
       if (recitationsData && recitationsData.length > 0) {
         // First, group recitations by assignment_id
-        const recitationsByAssignment = recitationsData.reduce((acc, recitation) => {
+        const recitationsByAssignment = recitationsData.reduce((acc: Record<string, any[]>, recitation: any) => {
           if (!acc[recitation.assignment_id]) {
             acc[recitation.assignment_id] = []
           }
@@ -136,12 +129,12 @@ export default function AssignmentsPage() {
           const assignmentRecitations = recitationsByAssignment[assignmentId]
 
           // Find the recitation marked as latest
-          const latestRecitation = assignmentRecitations.find((r) => r.is_latest)
+          const latestRecitation = assignmentRecitations.find((r: any) => r.is_latest)
 
           // If none is marked as latest, sort by submitted_at and take the most recent
           if (!latestRecitation && assignmentRecitations.length > 0) {
             assignmentRecitations.sort(
-              (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
+              (a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
             )
             recitationMap.set(assignmentId, assignmentRecitations[0])
           } else if (latestRecitation) {
@@ -150,15 +143,10 @@ export default function AssignmentsPage() {
         })
       }
 
-      console.log(`Created recitation map with ${recitationMap.size} entries`)
-
       // Step 5: Process assignments with submission status
-      return assignmentsData.map((assignment) => {
+      return assignmentsData.map((assignment: any) => {
         const recitation = recitationMap.get(assignment.id)
         const isOverdue = isPastDuePST(assignment.due_date)
-
-        // Log the status determination for debugging
-        console.log(`Assignment ${assignment.id}: recitation=${!!recitation}, isOverdue=${isOverdue}`)
 
         return {
           ...assignment,
@@ -169,25 +157,29 @@ export default function AssignmentsPage() {
       })
     } catch (error) {
       console.error("Error in fetchStudentAssignments:", error)
+      // Return an empty array or re-throw, but for now, let's not set the error state here
+      // as the calling function will handle it.
       throw error
     }
   }
 
   // Load data function
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const supabase = createClientComponentClient()
 
       // Check if user is authenticated
-      const { data: sessionData } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-      if (!sessionData.session) {
+      if (!session) {
         router.push("/login")
         return
       }
 
-      const userId = sessionData.session.user.id
+      const userId = session.user.id
 
       // Get user profile
       const { data: profileData, error: profileError } = await supabase
@@ -197,7 +189,10 @@ export default function AssignmentsPage() {
         .single()
 
       if (profileError || !profileData) {
-        throw new Error("Failed to load profile")
+        // Instead of throwing an error, set the error state to be displayed in the UI.
+        setError("Failed to load your profile. Please try refreshing the page.")
+        setLoading(false) // Make sure to stop loading
+        return
       }
 
       // Verify user is a student
@@ -206,11 +201,8 @@ export default function AssignmentsPage() {
         return
       }
 
-      setProfile(profileData)
-
       // Fetch assignments using our dedicated function
       const processedAssignments = await fetchStudentAssignments(supabase, userId)
-      console.log(`Setting ${processedAssignments.length} assignments to state`)
       setAssignments(processedAssignments)
     } catch (error: any) {
       console.error("Error loading assignments:", error)
@@ -218,11 +210,11 @@ export default function AssignmentsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
 
   useEffect(() => {
     loadData()
-  }, [router])
+  }, [loadData])
 
   // Helper function to generate assignment title
   const generateAssignmentTitle = (surahName: string, startAyah: number, endAyah: number) => {
@@ -292,26 +284,15 @@ export default function AssignmentsPage() {
   // Refresh function
   const handleRefresh = async () => {
     setRefreshing(true)
+    setError(null) // Clear previous errors
     try {
-      const supabase = createClientComponentClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-
-      if (sessionData.session) {
-        const userId = sessionData.session.user.id
-        const processedAssignments = await fetchStudentAssignments(supabase, userId)
-        setAssignments(processedAssignments)
-        toast({
-          title: "Refreshed",
-          description: "Your assignments have been refreshed",
-        })
-      }
-    } catch (error) {
-      console.error("Error refreshing assignments:", error)
+      await loadData()
       toast({
-        title: "Error",
-        description: "Failed to refresh assignments",
-        variant: "destructive",
+        title: "Assignments Updated",
+        description: "Your assignments have been successfully refreshed.",
       })
+    } catch (error: any) {
+      setError(error.message)
     } finally {
       setRefreshing(false)
     }
@@ -326,11 +307,31 @@ export default function AssignmentsPage() {
     return typeof fallback === 'number' ? Math.round(fallback * 10000) / 100 : 0;
   }
 
+  // Early return for loading state
   if (loading) {
     return (
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        </div>
+      </AuthenticatedLayout>
+    )
+  }
+
+  // Early return for error state
+  if (error) {
+    return (
+      <AuthenticatedLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-6 text-center">
+            <AlertCircle className="mx-auto h-12 w-12" />
+            <h2 className="mt-4 text-2xl font-bold">Error Loading Assignments</h2>
+            <p className="mt-2 text-destructive/80">{error}</p>
+            <Button onClick={handleRefresh} className="mt-6" variant="destructive">
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Try Again
+            </Button>
+          </div>
         </div>
       </AuthenticatedLayout>
     )

@@ -1,110 +1,145 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { createClientComponentClient } from "@/lib/supabase/client"
+import { getStudentCountForClass } from "@/lib/supabase/client"
 import AuthenticatedLayout from "@/components/authenticated-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Calendar, Users, BookOpen, CheckCircle, Trash2, XCircle, School, User } from "lucide-react"
 import { formatDatePST } from "@/lib/date-utils"
-import { BookOpen, Calendar, CheckCircle, School, User, Users, XCircle } from "lucide-react"
-import Link from "next/link"
+import { useAssignmentDeletion } from "@/hooks/use-assignment-deletion"
+import { TeacherDashboard } from "./teacher-dashboard"
+import { StudentDashboard } from "./student-dashboard"
+import { ParentDashboard } from "./parent-dashboard"
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null)
   const [classes, setClasses] = useState<any[]>([])
   const [assignments, setAssignments] = useState<any[]>([])
-  const [completedAssignments, setCompletedAssignments] = useState<any[]>([])
   const [recitations, setRecitations] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [completedAssignments, setCompletedAssignments] = useState<any[]>([])
   const [lateSubmissions, setLateSubmissions] = useState<any[]>([])
   const [showLateAlert, setShowLateAlert] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { deleteAssignment, isDeleting } = useAssignmentDeletion()
+
+  const router = useRouter()
+
+  const loadData = useCallback(async () => {
+    // Add a timeout for the loading process
+    const timeout = setTimeout(() => {
+      setError("The dashboard is taking a long time to load. Please try refreshing the page.")
+      setLoading(false)
+    }, 10000) // 10-second timeout
+
+    try {
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        clearTimeout(timeout)
+        router.push("/login")
+        return
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single()
+
+      if (profileError || !profileData) {
+        setError("Failed to load your profile. Please refresh the page.")
+        return
+      }
+
+      setProfile(profileData)
+
+      if (profileData.role === "teacher") {
+        await loadTeacherData(supabase, session.user.id)
+      } else if (profileData.role === "student") {
+        await loadStudentData(supabase, session.user.id)
+      }
+    } catch (error: any) {
+      console.error("Error loading dashboard:", error)
+      setError("An unexpected error occurred while loading the dashboard.")
+    } finally {
+      clearTimeout(timeout)
+      setLoading(false)
+    }
+  }, [router])
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const supabase = createClientComponentClient()
-
-        // Check if user is authenticated
-        const { data: sessionData } = await supabase.auth.getSession()
-
-        if (!sessionData.session) {
-          return
-        }
-
-        const userId = sessionData.session.user.id
-
-        // Get user profile
-        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", userId).single()
-
-        if (!profileData) {
-          return
-        }
-
-        setProfile(profileData)
-
-        // Fetch data based on user role
-        if (profileData.role === "teacher") {
-          await loadTeacherData(supabase, userId)
-        } else if (profileData.role === "student") {
-          await loadStudentData(supabase, userId)
-        } else if (profileData.role === "parent") {
-          // Parent data loading would go here
-        }
-      } catch (error: any) {
-        console.error("Error loading dashboard:", error)
-        setError(error.message || "An unexpected error occurred")
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadData()
-  }, [])
+  }, [loadData])
 
   const loadTeacherData = async (supabase: any, userId: string) => {
     try {
       // Fetch teacher's classes
-      const { data: classesData } = await supabase
+      const { data: classesData, error: classesError } = await supabase
         .from("classes")
         .select("*")
         .eq("teacher_id", userId)
         .order("created_at", { ascending: false })
 
-      // For each class, get the student count
+      if (classesError) {
+        console.error("Error fetching classes:", classesError.message)
+        throw new Error("Failed to load classes.")
+      }
+
+      // For each class, get the student count using the helper
       const classesWithDetails = await Promise.all(
         (classesData || []).map(async (classItem: any) => {
-          const { count } = await supabase
-            .from("class_students")
-            .select("*", { count: "exact", head: true })
-            .eq("class_id", classItem.id)
-
-          return {
-            ...classItem,
-            student_count: count || 0,
+          try {
+            const count = await getStudentCountForClass(supabase, classItem.id)
+            return {
+              ...classItem,
+              student_count: count,
+            }
+          } catch (error) {
+            console.error(`Failed to get student count for class ${classItem.id}:`, error)
+            return {
+              ...classItem,
+              student_count: "Error", // Display an error state for this specific class
+            }
           }
         }),
       )
-
       setClasses(classesWithDetails)
 
       // Fetch assignments
-      const { data: assignmentsData } = await supabase
+      const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("assignments")
         .select("id, title, surah, due_date, class_id, teacher_id, surah_name, start_ayah, end_ayah")
         .eq("teacher_id", userId)
         .gte("due_date", new Date().toISOString().split("T")[0])
         .order("due_date", { ascending: true })
 
+      if (assignmentsError) {
+        console.error("Error fetching assignments:", assignmentsError.message)
+        throw new Error("Failed to load assignments.")
+      }
+
       if (assignmentsData && assignmentsData.length > 0) {
         // Get unique class IDs
         const classIds = [...new Set(assignmentsData.map((a: any) => a.class_id).filter(Boolean))]
 
         // Fetch class names
-        const { data: classesData } = await supabase.from("classes").select("id, name").in("id", classIds)
+        const { data: classNamesData, error: classNamesError } = await supabase
+          .from("classes")
+          .select("id, name")
+          .in("id", classIds)
+
+        if (classNamesError) {
+          console.error("Error fetching class names:", classNamesError.message)
+          // Continue without class names if this fails
+        }
 
         // Create a map of class IDs to names
-        const classMap = (classesData || []).reduce((map: any, c: any) => {
+        const classMap = (classNamesData || []).reduce((map: any, c: any) => {
           map[c.id] = c.name
           return map
         }, {})
@@ -119,23 +154,33 @@ export default function DashboardPage() {
         // Fetch latest recitations for all assignments
         const assignmentIds = formattedAssignments.map((a: any) => a.id)
         if (assignmentIds.length > 0) {
-          const { data: recitationsData } = await supabase
+          const { data: recitationsData, error: recitationsError } = await supabase
             .from("recitations")
-            .select("id, assignment_id, student_id, submitted_at, is_latest, assignments(id, title, due_date), profiles(id, first_name, last_name)")
+            .select(
+              "id, assignment_id, student_id, submitted_at, is_latest, assignments(id, title, due_date), profiles(id, first_name, last_name)",
+            )
             .in("assignment_id", assignmentIds)
             .eq("is_latest", true)
+
+          if (recitationsError) {
+            console.error("Error fetching recitations:", recitationsError.message)
+            // Continue without recitation data
+          }
+
           // Find late submissions
-          const late = (recitationsData || []).filter((rec: any) => {
-            const due = new Date(rec.assignments?.due_date)
-            const submitted = new Date(rec.submitted_at)
-            return submitted > due
-          }).map((rec: any) => ({
-            id: rec.id,
-            student: rec.profiles ? `${rec.profiles.first_name} ${rec.profiles.last_name}` : rec.student_id,
-            assignment: rec.assignments?.title || rec.assignment_id,
-            submitted_at: rec.submitted_at,
-            due_date: rec.assignments?.due_date,
-          }))
+          const late = (recitationsData || [])
+            .filter((rec: any) => {
+              const due = new Date(rec.assignments?.due_date)
+              const submitted = new Date(rec.submitted_at)
+              return submitted > due
+            })
+            .map((rec: any) => ({
+              id: rec.id,
+              student: rec.profiles ? `${rec.profiles.first_name} ${rec.profiles.last_name}` : rec.student_id,
+              assignment: rec.assignments?.title || rec.assignment_id,
+              submitted_at: rec.submitted_at,
+              due_date: rec.assignments?.due_date,
+            }))
           setLateSubmissions(late)
         }
       } else {
@@ -143,44 +188,70 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Error loading teacher data:", error)
+      // We are already handling the error display in the main loadData function.
+      // Re-throwing the error will allow the main catch block to handle it.
+      throw error
     }
   }
 
   const loadStudentData = async (supabase: any, userId: string) => {
     try {
       // Fetch student's recitations
-      const { data: recitationsData } = await supabase
+      const { data: recitationsData, error: recitationsError } = await supabase
         .from("recitations")
         .select("*, assignments(*), feedback(*)")
         .eq("student_id", userId)
         .eq("is_latest", true)
         .order("submitted_at", { ascending: false })
 
+      if (recitationsError) {
+        console.error("Error fetching student recitations:", recitationsError.message)
+        throw new Error("Failed to load your submissions.")
+      }
+
       setRecitations(recitationsData || [])
 
       // Fetch student's enrolled classes
-      const { data: enrollmentsData } = await supabase
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
         .from("class_students")
         .select("class_id")
         .eq("student_id", userId)
 
+      if (enrollmentsError) {
+        console.error("Error fetching enrollments:", enrollmentsError.message)
+        throw new Error("Failed to load your class enrollments.")
+      }
+
       if (enrollmentsData && enrollmentsData.length > 0) {
         const classIds = enrollmentsData.map((e: any) => e.class_id)
 
-        const { data: classesData } = await supabase.from("classes").select("*").in("id", classIds)
+        const { data: classesData, error: studentClassesError } = await supabase
+          .from("classes")
+          .select("*")
+          .in("id", classIds)
 
-        // For each class, fetch the student count (count of class_students rows)
+        if (studentClassesError) {
+          console.error("Error fetching student classes:", studentClassesError.message)
+          throw new Error("Failed to load your classes.")
+        }
+
+        // For each class, fetch the student count using the helper
         const classesWithCounts = await Promise.all(
           (classesData || []).map(async (classItem: any) => {
-            const { count } = await supabase
-              .from("class_students")
-              .select("*", { count: "exact", head: true })
-              .eq("class_id", classItem.id)
-            return {
-              ...classItem,
-              student_count: count || 0,
+            try {
+              const count = await getStudentCountForClass(supabase, classItem.id)
+              return {
+                ...classItem,
+                student_count: count,
+              }
+            } catch (error) {
+              console.error(`Failed to get student count for class ${classItem.id}:`, error)
+              return {
+                ...classItem,
+                student_count: "N/A",
+              }
             }
-          })
+          }),
         )
         setClasses(classesWithCounts)
       } else {
@@ -188,27 +259,45 @@ export default function DashboardPage() {
       }
 
       // Fetch assignments
-      const { data: assignmentStudents } = await supabase
+      const { data: assignmentStudents, error: assignmentStudentsError } = await supabase
         .from("assignment_students")
         .select("assignment_id")
         .eq("student_id", userId)
 
+      if (assignmentStudentsError) {
+        console.error("Error fetching assigned assignments:", assignmentStudentsError.message)
+        throw new Error("Failed to load your assignments.")
+      }
+
       if (assignmentStudents && assignmentStudents.length > 0) {
         const assignmentIds = assignmentStudents.map((item: any) => item.assignment_id)
 
-        const { data: studentAssignments } = await supabase
+        const { data: studentAssignments, error: studentAssignmentsError } = await supabase
           .from("assignments")
           .select("*")
           .in("id", assignmentIds)
           .gte("due_date", new Date().toISOString().split("T")[0])
           .order("due_date", { ascending: true })
 
+        if (studentAssignmentsError) {
+          console.error("Error fetching student assignments:", studentAssignmentsError.message)
+          throw new Error("Failed to load assignment details.")
+        }
+
         if (studentAssignments && studentAssignments.length > 0) {
           // Get class names
           const classIds = [...new Set(studentAssignments.map((a: any) => a.class_id).filter(Boolean))]
 
           if (classIds.length > 0) {
-            const { data: classesData } = await supabase.from("classes").select("id, name").in("id", classIds)
+            const { data: classesData, error: classNamesError } = await supabase
+              .from("classes")
+              .select("id, name")
+              .in("id", classIds)
+
+            if (classNamesError) {
+              console.error("Error fetching class names for assignments:", classNamesError.message)
+              // Continue without class names
+            }
 
             const classMap = (classesData || []).reduce((map: any, c: any) => {
               map[c.id] = c.name
@@ -221,11 +310,16 @@ export default function DashboardPage() {
             }))
 
             // Check which assignments have been submitted
-            const { data: latestRecitations } = await supabase
+            const { data: latestRecitations, error: recitationsError } = await supabase
               .from("recitations")
               .select("assignment_id")
               .eq("student_id", userId)
               .eq("is_latest", true)
+
+            if (recitationsError) {
+              console.error("Error fetching latest recitations:", recitationsError.message)
+              // Continue, but submitted status may be inaccurate
+            }
 
             const submittedAssignmentIds = new Set(latestRecitations?.map((r: any) => r.assignment_id) || [])
 
@@ -253,6 +347,31 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Error loading student data:", error)
+      throw error
+    }
+  }
+
+  // Handle assignment deletion
+  const handleDeleteAssignment = async (assignmentId: string, assignmentTitle: string) => {
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${assignmentTitle}"? This action cannot be undone and will remove all associated submissions.`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    // Optimistically remove from UI
+    const originalAssignments = [...assignments]
+    setAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId))
+
+    // Attempt deletion
+    const success = await deleteAssignment(assignmentId)
+
+    if (!success) {
+      // Restore the assignment if deletion failed
+      setAssignments(originalAssignments)
     }
   }
 
@@ -274,21 +393,46 @@ export default function DashboardPage() {
     return formatDatePST(dateString, { month: "short", day: "numeric" })
   }
 
-  if (loading || !profile) {
-    return (
-      <AuthenticatedLayout>
+  const renderDashboardContent = () => {
+    if (loading || !profile) {
+      return (
         <div className="flex justify-center items-center h-64">
           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
         </div>
-      </AuthenticatedLayout>
-    )
+      )
+    }
+
+    switch (profile.role) {
+      case "teacher":
+        return (
+          <TeacherDashboard
+            profile={profile}
+            classes={classes}
+            assignments={assignments}
+            handleDeleteAssignment={handleDeleteAssignment}
+            isDeleting={isDeleting}
+          />
+        )
+      case "student":
+        return (
+          <StudentDashboard
+            classes={classes}
+            assignments={assignments}
+            completedAssignments={completedAssignments}
+          />
+        )
+      case "parent":
+        return <ParentDashboard />
+      default:
+        return <p>Welcome! Your dashboard is being set up.</p>
+    }
   }
 
   return (
     <AuthenticatedLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Late Submissions Alert */}
-        {profile?.role === "teacher" && showLateAlert && lateSubmissions.length > 0 && (
+        {profile?.role === "teacher" && lateSubmissions.length > 0 && showLateAlert && (
           <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 rounded p-4 mb-6 relative">
             <button
               className="absolute top-2 right-2 text-yellow-700 hover:text-yellow-900"
@@ -310,512 +454,19 @@ export default function DashboardPage() {
 
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Welcome, {profile.first_name || profile.email.split("@")[0]}
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {profile?.first_name || "User"}!
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {profile.role === "teacher"
-              ? "Manage your classes and assignments"
-              : profile.role === "student"
-                ? "Track your assignments and progress"
-                : "Monitor your children's progress"}
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            {profile?.role === "teacher"
+              ? "Here's an overview of your classes and assignments."
+              : profile?.role === "student"
+              ? "Track your progress and upcoming assignments."
+              : "Monitor your children's learning progress."}
           </p>
         </div>
 
-        {/* Parent-specific content */}
-        {profile.role === "parent" && (
-          <div className="mb-8 bg-primary/5 p-6 rounded-lg border border-primary/10">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Parent Dashboard</h2>
-            <p className="text-primary-foreground mb-4">
-              Welcome to Taleem! As a parent, you can monitor your children's progress, view their assignments, and
-              track their Quran recitation journey.
-            </p>
-            <Link
-              href="/parent-dashboard"
-              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Go to Parent Dashboard
-            </Link>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Classes */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Classes Section */}
-            {profile.role !== "parent" && (
-              <section>
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1">
-                    {profile.role === "teacher" ? "Your Classes" : "Enrolled Classes"}
-                  </h2>
-                  {profile.role === "teacher" ? (
-                    <Link href="/classes" className="text-sm font-medium text-primary hover:text-primary/80">
-                      Manage Classes
-                    </Link>
-                  ) : (
-                    <Link href="/join-class" className="text-sm font-medium text-primary hover:text-primary/80">
-                      Join a Class
-                    </Link>
-                  )}
-                </div>
-
-                {classes.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {classes.slice(0, 4).map((classItem: any) => (
-                      <Card key={classItem.id} className="border border-gray-200 shadow-sm">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base font-semibold">{classItem.name}</CardTitle>
-                          <p className="text-xs text-gray-500">Grade: {classItem.grade_level}</p>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="flex items-center text-sm text-gray-500 mt-2">
-                            <Users className="h-4 w-4 mr-1 text-gray-400" />
-                            <span>
-                              {classItem.student_count || 0} {classItem.student_count === 1 ? "Student" : "Students"}
-                            </span>
-                          </div>
-                          <div className="mt-4">
-                            <Link
-                              href={`/classes/${classItem.id}`}
-                              className="text-sm font-medium text-primary hover:text-primary/80"
-                            >
-                              View Details
-                            </Link>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="border border-gray-200 shadow-sm">
-                    <CardContent className="p-6 text-center">
-                      <p className="text-gray-500">
-                        {profile.role === "teacher"
-                          ? "You haven't created any classes yet."
-                          : "You are not enrolled in any classes yet."}
-                      </p>
-                      <Link
-                        href={profile.role === "teacher" ? "/classes" : "/join-class"}
-                        className="mt-2 inline-block text-sm font-medium text-primary hover:text-primary/80"
-                      >
-                        {profile.role === "teacher" ? "Create Your First Class" : "Join a Class"}
-                      </Link>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {classes.length > 4 && (
-                  <div className="mt-4 text-center">
-                    <Link href="/classes" className="text-sm font-medium text-primary hover:text-primary/80">
-                      View All Classes
-                    </Link>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Quick Links Section */}
-            <section>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1 mb-4">
-                Quick Links
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {profile.role === "teacher" && (
-                  <>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <Users className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Manage Students</h3>
-                        <p className="text-xs text-gray-500 mb-3">View and manage your students</p>
-                        <Link href="/classes" className="text-xs font-medium text-primary hover:text-primary/80">
-                          View Students
-                        </Link>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <BookOpen className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Create Assignment</h3>
-                        <p className="text-xs text-gray-500 mb-3">Assign new work to your students</p>
-                        <Link
-                          href="/assignments/new"
-                          className="text-xs font-medium text-primary hover:text-primary/80"
-                        >
-                          Create New
-                        </Link>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <School className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Create Class</h3>
-                        <p className="text-xs text-gray-500 mb-3">Set up a new class for your students</p>
-                        <Link href="/classes" className="text-xs font-medium text-primary hover:text-primary/80">
-                          Create Class
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-
-                {profile.role === "student" && (
-                  <>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <BookOpen className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">View Assignments</h3>
-                        <p className="text-xs text-gray-500 mb-3">Check your current assignments</p>
-                        <Link href="/assignments" className="text-xs font-medium text-primary hover:text-primary/80">
-                          View All
-                        </Link>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <CheckCircle className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Completed Work</h3>
-                        <p className="text-xs text-gray-500 mb-3">Review your submitted assignments</p>
-                        <Link
-                          href="/assignments?tab=completed"
-                          className="text-xs font-medium text-primary hover:text-primary/80"
-                        >
-                          View Completed
-                        </Link>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <User className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Update Profile</h3>
-                        <p className="text-xs text-gray-500 mb-3">Manage your account information</p>
-                        <Link href="/profile" className="text-xs font-medium text-primary hover:text-primary/80">
-                          Edit Profile
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-
-                {profile?.role === "parent" && (
-                  <>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <Users className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">View Children</h3>
-                        <p className="text-xs text-gray-500 mb-3">Monitor your children's progress</p>
-                        <Link
-                          href="/parent-dashboard"
-                          className="text-xs font-medium text-primary hover:text-primary/80"
-                        >
-                          View Dashboard
-                        </Link>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <BookOpen className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Add Child</h3>
-                        <p className="text-xs text-gray-500 mb-3">Link your child's account to your profile</p>
-                        <Link
-                          href="/parent-dashboard"
-                          className="text-xs font-medium text-primary hover:text-primary/80"
-                        >
-                          Add Child
-                        </Link>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                          <User className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-1">Update Profile</h3>
-                        <p className="text-xs text-gray-500 mb-3">Manage your account information</p>
-                        <Link href="/profile" className="text-xs font-medium text-primary hover:text-primary/80">
-                          Edit Profile
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* Right Column - Assignments & Activity */}
-          <div className="space-y-6">
-            {/* Assignments Section */}
-            <section>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1">
-                  {profile.role === "teacher" ? "Upcoming Assignments" : "Your Assignments"}
-                </h2>
-                {profile.role === "teacher" ? (
-                  <Link href="/assignments/new" className="text-sm font-medium text-primary hover:text-primary/80">
-                    Create New
-                  </Link>
-                ) : (
-                  <Link href="/assignments" className="text-sm font-medium text-primary hover:text-primary/80">
-                    View All
-                  </Link>
-                )}
-              </div>
-
-              {assignments.length > 0 ? (
-                <div className="space-y-3">
-                  {assignments.slice(0, 5).map((assignment: any) => (
-                    <Card key={assignment.id} className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium text-sm">
-                              {assignment.title ||
-                                (assignment.surah_name && assignment.start_ayah && assignment.end_ayah
-                                  ? generateAssignmentTitle(
-                                      assignment.surah_name,
-                                      assignment.start_ayah,
-                                      assignment.end_ayah,
-                                    )
-                                  : assignment.surah)}
-                            </h3>
-                            {assignment.class_name && (
-                              <p className="text-xs text-gray-500 mt-0.5">Class: {assignment.class_name}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center text-xs text-gray-500">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            <span>Due {formatDate(assignment.due_date)}</span>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex justify-between items-center">
-                          <p className="text-xs text-gray-500">
-                            {assignment.surah_name
-                              ? `${assignment.surah_name.split(" (")[0].replace(/^\d+\.\s+/, "")}`
-                              : assignment.surah}
-                            {assignment.start_ayah && assignment.end_ayah
-                              ? `, Ayahs ${assignment.start_ayah}-${assignment.end_ayah}`
-                              : ""}
-                          </p>
-                          {profile.role === "student" && (
-                            <Link
-                              href={`/recitations/new?assignment=${assignment.id}`}
-                              className="text-xs font-medium text-primary hover:text-primary/80"
-                            >
-                              Submit
-                            </Link>
-                          )}
-                          {profile.role === "teacher" && (
-                            <Link
-                              href={`/assignments/${assignment.id}`}
-                              className="text-xs font-medium text-primary hover:text-primary/80"
-                            >
-                              View Details
-                            </Link>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardContent className="p-6 text-center">
-                    <p className="text-gray-500">
-                      {profile.role === "teacher"
-                        ? "You haven't created any assignments yet."
-                        : "You don't have any pending assignments."}
-                    </p>
-                    {profile.role === "teacher" && (
-                      <Link
-                        href="/assignments/new"
-                        className="mt-2 inline-block text-sm font-medium text-primary hover:text-primary/80"
-                      >
-                        Create Your First Assignment
-                      </Link>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </section>
-
-            {/* Recent Activity Section */}
-            {profile.role !== "parent" && (
-              <section>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1 mb-4">
-                  Recent Activity
-                </h2>
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-gray-200">
-                      {profile.role === "student" && recitations.length > 0 ? (
-                        recitations.slice(0, 3).map((recitation: any) => (
-                          <div key={recitation.id} className="p-3">
-                            <div className="flex items-start">
-                              <div className="flex-shrink-0 mt-0.5">
-                                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
-                                </div>
-                              </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium">
-                                  Submitted recitation for{" "}
-                                  <span className="text-gray-900 dark:text-white">
-                                    {recitation.assignments?.title ||
-                                      (recitation.assignments?.surah_name &&
-                                      recitation.assignments?.start_ayah &&
-                                      recitation.assignments?.end_ayah
-                                        ? generateAssignmentTitle(
-                                            recitation.assignments?.surah_name,
-                                            recitation.assignments?.start_ayah,
-                                            recitation.assignments?.end_ayah,
-                                          )
-                                        : recitation.assignments?.surah)}
-                                  </span>
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {new Date(recitation.submitted_at).toLocaleDateString()}
-                                </p>
-                                {recitation.feedback && (
-                                  <div className="mt-1 text-xs">
-                                    <span className="font-medium text-gray-700">Feedback:</span>{" "}
-                                    <span className="text-green-600">
-                                      {Math.round(recitation.feedback.accuracy * 100)}% accuracy
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : profile.role === "teacher" ? (
-                        <>
-                          <div className="p-3">
-                            <div className="flex items-start">
-                              <div className="flex-shrink-0 mt-0.5">
-                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                  <Users className="h-4 w-4 text-blue-600" />
-                                </div>
-                              </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium">
-                                  New student joined{" "}
-                                  <span className="text-gray-900 dark:text-white">Quran Memorization</span>
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">Today</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-3">
-                            <div className="flex items-start">
-                              <div className="flex-shrink-0 mt-0.5">
-                                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                                  <BookOpen className="h-4 w-4 text-primary" />
-                                </div>
-                              </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium">
-                                  Created assignment{" "}
-                                  <span className="text-gray-900 dark:text-white">Al-Fatiha Memorization</span>
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">Yesterday</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-3">
-                            <div className="flex items-start">
-                              <div className="flex-shrink-0 mt-0.5">
-                                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
-                                </div>
-                              </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium">
-                                  Provided feedback on{" "}
-                                  <span className="text-gray-900 dark:text-white">Ahmed's recitation</span>
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">2 days ago</p>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="p-6 text-center">
-                          <p className="text-gray-500">No recent activity to display.</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Stats Section */}
-            {profile.role !== "parent" && (
-              <section>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1 mb-4">
-                  {profile.role === "teacher" ? "Class Statistics" : "Your Progress"}
-                </h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="border border-gray-200 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                          {profile.role === "teacher" ? (
-                            <Users className="h-5 w-5 text-primary" />
-                          ) : (
-                            <BookOpen className="h-5 w-5 text-primary" />
-                          )}
-                        </div>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {profile.role === "teacher"
-                            ? classes.length
-                            : assignments.length + completedAssignments.length}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {profile.role === "teacher" ? "Total Classes" : "Total Assignments"}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="border border-gray-200 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        </div>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {profile.role === "teacher" ? assignments.length : completedAssignments.length}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {profile.role === "teacher" ? "Active Assignments" : "Completed"}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </section>
-            )}
-          </div>
-        </div>
+        {renderDashboardContent()}
       </div>
     </AuthenticatedLayout>
   )

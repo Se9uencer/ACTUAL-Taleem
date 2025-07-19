@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { supabaseConfig } from "@/lib/config";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  
   // 1. Require authentication
   const authHeader = request.headers.get("authorization") || request.headers.get("Authorization");
   let accessToken: string | null = null;
@@ -18,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 
   // 2. Validate ID
-  const recitationId = params.id;
+  const recitationId = id;
   if (!recitationId) {
     return NextResponse.json({ error: "Missing recitation ID" }, { status: 400 });
   }

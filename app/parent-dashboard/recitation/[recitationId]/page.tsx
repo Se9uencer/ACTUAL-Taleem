@@ -96,7 +96,7 @@ export default function ParentRecitationFeedbackPage() {
         const { data: studentData, error: studentError } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", recitationData.student_id)
+          .eq("id", String(recitationData.student_id))
           .single()
 
         if (studentError || !studentData) {
@@ -108,7 +108,7 @@ export default function ParentRecitationFeedbackPage() {
           .from("parent_child_link")
           .select("*")
           .eq("parent_id", userId)
-          .eq("child_id", recitationData.student_id)
+          .eq("child_id", String(recitationData.student_id))
           .single()
 
         if (linkError || !parentChildLink) {

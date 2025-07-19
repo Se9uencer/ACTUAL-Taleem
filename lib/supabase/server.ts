@@ -4,8 +4,6 @@ import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import { supabaseConfig } from "../config"
 
-console.log('SRK:', process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0,8))
-
 // Change to async function to comply with Server Actions requirements
 export const createServerClient = async () => {
   try {
@@ -21,19 +19,7 @@ export const createServerClient = async () => {
       throw new Error("Missing Supabase URL or anon key in server client")
     }
 
-    return createClient(supabaseConfig.url, supabaseConfig.anonKey, {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set() {
-          // This is a read-only cookie in a server component
-        },
-        remove() {
-          // This is a read-only cookie in a server component
-        },
-      },
-    })
+    return createClient(supabaseConfig.url, supabaseConfig.anonKey)
   } catch (error) {
     console.error("Error creating Supabase server client:", error)
     throw new Error("Failed to initialize Supabase server client. Please check your configuration.")

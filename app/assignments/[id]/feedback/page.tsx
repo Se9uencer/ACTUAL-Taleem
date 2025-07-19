@@ -18,7 +18,6 @@ export default function AssignmentFeedbackPage() {
   const [feedback, setFeedback] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [profile, setProfile] = useState<any>(null)
 
   const params = useParams()
   const router = useRouter()
@@ -56,8 +55,6 @@ export default function AssignmentFeedbackPage() {
           router.push("/dashboard")
           return
         }
-
-        setProfile(profileData)
 
         // Fetch assignment details
         const { data: assignmentData, error: assignmentError } = await supabase
@@ -153,7 +150,9 @@ export default function AssignmentFeedbackPage() {
   const [showDetails, setShowDetails] = useLocalState(false);
   let verseFeedback = recitation?.verse_feedback;
   if (typeof verseFeedback === "string") {
-    try { verseFeedback = JSON.parse(verseFeedback); } catch {}
+    try { verseFeedback = JSON.parse(verseFeedback); } catch {
+      // If parsing fails, keep verseFeedback as string
+    }
   }
 
   // Helper to compute average verse accuracy to 2 decimal places
@@ -215,7 +214,7 @@ export default function AssignmentFeedbackPage() {
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Assignment Not Found</h2>
             <p className="text-muted-foreground mb-6">
-              The assignment you're looking for doesn't exist or you haven't submitted it yet.
+              The assignment you&apos;re looking for doesn&apos;t exist or you haven&apos;t submitted it yet.
             </p>
             <Button onClick={() => router.push("/assignments")} variant="outline">
               Back to Assignments
@@ -462,7 +461,7 @@ export default function AssignmentFeedbackPage() {
                                   <ul className="text-sm space-y-1">
                                     {verse.differences.map((diff: any, i: number) => (
                                       <li key={i} className="text-gray-700">
-                                        • Word {diff.position}: Expected "{diff.expected}" → Heard "{diff.transcribed}"
+                                        • Word {diff.position}: Expected &quot;{diff.expected}&quot; → Heard &quot;{diff.transcribed}&quot;
                                       </li>
                                     ))}
                                   </ul>

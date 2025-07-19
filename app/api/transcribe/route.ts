@@ -6,11 +6,50 @@ import { normalizeArabicText, calculateSimilarity } from "@/lib/arabic-utils"
 import OpenAI from 'openai'
 import quranData from "@/quran.json"
 
+// File upload security constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_AUDIO_TYPES = [
+  "audio/mpeg",
+  "audio/mp3", 
+  "audio/x-m4a",
+  "audio/wav"
+]
+
+// TODO: Future security enhancements
+// - Implement rate limiting per user (e.g., max 10 uploads per hour)
+// - Add virus scanning for uploaded files
+// - Add file content validation beyond MIME type checking
+// - Implement file hash verification for duplicate detection
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+// File validation helper function
+function validateAudioFile(file: File): { isValid: boolean; error?: string } {
+  // Check if file exists
+  if (!file) {
+    return { isValid: false, error: "No file uploaded" }
+  }
 
+  // Check file size
+  if (file.size > MAX_FILE_SIZE) {
+    return { 
+      isValid: false, 
+      error: `File too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)}MB` 
+    }
+  }
+
+  // Check file type
+  if (!ALLOWED_AUDIO_TYPES.includes(file.type)) {
+    return { 
+      isValid: false, 
+      error: `Unsupported file type. Allowed types: ${ALLOWED_AUDIO_TYPES.join(", ")}` 
+    }
+  }
+
+  return { isValid: true }
+}
 
 // Get expected verses from quran.json
 function getExpectedVerses(surahNumber: number, startAyah: number, endAyah: number): string {
@@ -138,6 +177,9 @@ export async function POST(request: Request) {
     }
 
     // Verify user
+    if (!supabaseConfig.url || !supabaseConfig.anonKey) {
+      return NextResponse.json({ error: "Supabase configuration is missing." }, { status: 500 });
+    }
     const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey)
     const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken)
     
@@ -150,8 +192,19 @@ export async function POST(request: Request) {
     const audioFile = formData.get("file") as File | null
     const assignmentId = formData.get("assignmentId") as string
 
-    if (!audioFile || !assignmentId) {
-      return NextResponse.json({ error: "Missing audio file or assignment ID" }, { status: 400 })
+    // Validate required fields
+    if (!audioFile) {
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 })
+    }
+
+    if (!assignmentId) {
+      return NextResponse.json({ error: "Missing assignment ID" }, { status: 400 })
+    }
+
+    // Validate audio file
+    const fileValidation = validateAudioFile(audioFile)
+    if (!fileValidation.isValid) {
+      return NextResponse.json({ error: fileValidation.error }, { status: 400 })
     }
 
     // Get assignment details
@@ -214,7 +267,7 @@ export async function POST(request: Request) {
 
     // Generate overall feedback
     let feedback = ""
-    let status = "completed"
+    const status = "completed"
 
     if (averageVerseAccuracy >= 0.95) {
       feedback = `Excellent recitation! ${excellentVerses}/${verseFeedback.length} verses were nearly perfect.`

@@ -12,7 +12,7 @@ import { supabaseConfig } from "@/lib/config"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { AlertCircle, CheckCircle, Mail } from "lucide-react"
+import { AlertCircle, CheckCircle } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -24,10 +24,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [resendEmailVisible, setResendEmailVisible] = useState(false)
-  const [currentEmail, setCurrentEmail] = useState("")
-  const [resendingEmail, setResendingEmail] = useState(false)
-  const [resendSuccess, setResendSuccess] = useState(false)
+  
 
   useEffect(() => {
     // Check for message in URL
@@ -88,143 +85,59 @@ export default function LoginPage() {
     return true
   }
 
-  const handleResendConfirmationEmail = async () => {
-    if (!currentEmail) return
 
-    setResendingEmail(true)
-    setResendSuccess(false)
-
-    try {
-      const supabase = createClientComponentClient()
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: currentEmail,
-      })
-
-      if (error) {
-        throw error
-      }
-
-      setResendSuccess(true)
-    } catch (error: any) {
-      console.error("Error resending confirmation email:", error)
-      setError(`Failed to resend confirmation email: ${error.message}`)
-    } finally {
-      setResendingEmail(false)
-    }
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // 1. Return early if fields are empty
+    if (!email || !password) {
+      setError("Please enter both email and password.")
+      return
+    }
+
     setLoading(true)
     setError(null)
-    setDebugInfo([])
-    setResendEmailVisible(false)
+    setMessage(null)
+
+    const supabase = createClientComponentClient()
+    const normalizedEmail = email.toLowerCase().trim()
 
     try {
-      if (!supabaseConfig.isValid()) {
-        throw new Error("Invalid Supabase configuration")
-      }
-
-      const supabase = createClientComponentClient()
-
-      // Normalize email (convert to lowercase and trim)
-      const normalizedEmail = email.toLowerCase().trim()
-
-      // Sign in the user
-      addDebugInfo(`Attempting to sign in with email: ${normalizedEmail}`)
-
-      // Add retry logic for authentication
-      let authAttempt = 0
-      const maxAuthAttempts = 3
-      let authSuccess = false
-      let data
-      let signInError
-
-      while (!authSuccess && authAttempt < maxAuthAttempts) {
-        authAttempt++
-        addDebugInfo(`Auth attempt ${authAttempt}/${maxAuthAttempts}`)
-
-        try {
-          const result = await supabase.auth.signInWithPassword({
-            email: normalizedEmail,
-            password,
-          })
-
-          data = result.data
-          signInError = result.error
-
-          if (!signInError && data.user) {
-            authSuccess = true
-            addDebugInfo(`Auth successful on attempt ${authAttempt}`)
-          } else {
-            addDebugInfo(`Auth attempt ${authAttempt} failed: ${signInError?.message || "No user returned"}`)
-            // Wait a bit before retrying
-            if (authAttempt < maxAuthAttempts) {
-              await new Promise((resolve) => setTimeout(resolve, 1000))
-            }
-          }
-        } catch (err: any) {
-          addDebugInfo(`Exception during auth attempt ${authAttempt}: ${err.message}`)
-          // Wait a bit before retrying
-          if (authAttempt < maxAuthAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-          }
-        }
-      }
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      })
 
       if (signInError) {
-        // Just display the error message
-        addDebugInfo(`Sign in error after ${authAttempt} attempts: ${signInError.message}`)
-        throw signInError
+        // 3. Handle Supabase-specific Auth errors
+        if (signInError.name === "AuthApiError") {
+          setError("Invalid email or password.")
+        } else {
+          setError("An unexpected error occurred. Please try again.")
+        }
+
+        // 4. Log detailed error in development
+        if (process.env.NODE_ENV === "development") {
+          // Use console.warn to avoid triggering aggressive error overlays
+          console.warn("Supabase Login Handled Error:", signInError)
+        }
+        return // Stop execution if there was an error
       }
 
       if (!data.user) {
-        addDebugInfo(`No user returned after ${authAttempt} attempts`)
-        throw new Error("Login failed - no user returned")
+        setError("Login failed. Please try again.")
+        return
       }
 
-      addDebugInfo(`Sign in successful, user ID: ${data.user.id}`)
-
-      // Ensure profile exists
-      const profileCreated = await createProfileIfNeeded(supabase, data.user)
-      addDebugInfo(`Profile check completed: ${profileCreated ? "Profile exists/created" : "Profile creation failed"}`)
-
-      // Verify session is active
-      const { data: sessionData } = await supabase.auth.getSession()
-      addDebugInfo(`Session check: ${sessionData.session ? "Active" : "Not active"}`)
-
-      // Add a small delay to ensure all database operations complete
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      addDebugInfo("Redirecting to dashboard...")
-
-      // Use multiple redirect methods for redundancy
-      try {
-        // Store a flag in localStorage to indicate successful login
-        localStorage.setItem("taleem-auth-success", "true")
-
-        // Method 1: Next.js router
-        router.push("/dashboard")
-
-        // Method 2: Fallback to window.location after a delay
-        setTimeout(() => {
-          const redirected = localStorage.getItem("taleem-redirected")
-          if (redirected !== "true") {
-            addDebugInfo("Using fallback redirect method (window.location)")
-            localStorage.setItem("taleem-redirected", "true")
-            window.location.href = "/dashboard"
-          }
-        }, 1500)
-      } catch (routerError: any) {
-        addDebugInfo(`Router error: ${routerError}`)
-        // Method 3: Direct location change if all else fails
-        window.location.href = "/dashboard"
+      // On success, redirect to the dashboard
+      router.push("/dashboard")
+    } catch (error) {
+      // 5. Handle unexpected errors (e.g., network issues)
+      setError("A network error occurred. Please check your connection and try again.")
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Unexpected Login Handled Error:", error)
       }
-    } catch (error: any) {
-      console.error("Login error:", error)
-      setError(error.message || "An error occurred during login")
-      addDebugInfo(`Caught error: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -314,32 +227,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {resendEmailVisible && (
-              <div className="mt-6 p-4 bg-info/10 border border-info/20 rounded-md">
-                <h3 className="text-sm font-medium text-info flex items-center">
-                  <Mail className="h-4 w-4 mr-1.5" />
-                  Email Confirmation Required
-                </h3>
-                <p className="text-sm text-info mt-1">
-                  Please check your inbox and confirm your email before logging in.
-                </p>
-                {resendSuccess ? (
-                  <div className="mt-2 p-2 bg-success/20 text-success border border-success/20 rounded-md text-sm flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1.5" />
-                    Confirmation email sent! Please check your inbox.
-                  </div>
-                ) : (
-                  <Button
-                    variant="link"
-                    onClick={handleResendConfirmationEmail}
-                    disabled={resendingEmail}
-                    className="mt-2 p-0 h-auto text-info hover:text-info/80 font-medium"
-                  >
-                    {resendingEmail ? "Sending..." : "Resend confirmation email"}
-                  </Button>
-                )}
-              </div>
-            )}
+
 
             {debugInfo.length > 0 && (
               <div className="mt-6 p-3 bg-muted rounded-md">

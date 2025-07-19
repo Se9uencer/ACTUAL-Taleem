@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 
 // Add a comment to clarify that email confirmation is now optional
 // This route still handles OAuth callbacks and password resets
@@ -15,7 +14,6 @@ export async function GET(request: Request) {
     console.log("Auth callback received", code ? "with code" : "without code")
 
     if (code) {
-      const cookieStore = cookies()
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -24,19 +22,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(new URL("/login?error=configuration", request.url))
       }
 
-      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
-          },
-        },
-      })
+      const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
       try {
         // Add retry logic for code exchange
@@ -50,7 +36,7 @@ export async function GET(request: Request) {
           console.log(`Code exchange attempt ${exchangeAttempt}/${maxExchangeAttempts}`)
 
           try {
-            const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+            const { error } = await supabase.auth.exchangeCodeForSession(code)
 
             if (error) {
               console.error(`Error on exchange attempt ${exchangeAttempt}:`, error)

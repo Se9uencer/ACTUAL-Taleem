@@ -34,9 +34,9 @@ export function RecitationTranscription({ recitationId }: RecitationTranscriptio
         }
 
         if (data) {
-          setTranscript(data.transcription)
-          setStatus(data.transcription_status)
-          setError(data.transcription_error)
+          setTranscript(typeof data.transcription === 'string' ? data.transcription : null)
+          setStatus(typeof data.transcription_status === 'string' ? data.transcription_status : "")
+          setError(typeof data.transcription_error === 'string' ? data.transcription_error : null)
         }
       } catch (err: any) {
         console.error("Error fetching transcription:", err)

@@ -41,7 +41,7 @@ export function RecitationFeedback({ recitationId }: RecitationFeedbackProps) {
         }
         setRecitation(data)
         // Fetch signed URL for playback
-        if (data?.audio_url) {
+        if (data?.audio_url && typeof data.audio_url === 'string') {
           const { data: signedData } = await supabase.storage.from("recitations").createSignedUrl(data.audio_url, 60)
           setSignedUrl(signedData?.signedUrl || null)
         } else {

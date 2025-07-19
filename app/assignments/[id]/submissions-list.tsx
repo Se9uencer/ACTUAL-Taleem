@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import Link from "next/link"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-import { CheckCircleIcon, XCircleIcon, ClockIcon, PencilIcon, PlayIcon, PauseIcon, HistoryIcon, BrainCircuitIcon, AlertTriangleIcon, BookOpenIcon } from "lucide-react"
+import { CheckCircleIcon, XCircleIcon, ClockIcon, PlayIcon, PauseIcon, AlertTriangleIcon, BookOpenIcon } from "lucide-react"
 import { formatDateTimePST } from "@/lib/date-utils"
 
 interface VerseFeedback {
@@ -73,7 +72,6 @@ export default function SubmissionsList({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null)
-  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null)
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
 
   // Define loadSubmissions so it can be reused by the real-time subscription
@@ -244,7 +242,7 @@ export default function SubmissionsList({
               </div>
 
               <div className="border-t border-border pt-4">
-                 <h5 className="text-sm font-medium text-foreground mb-2 flex items-center"><BrainCircuitIcon className="h-4 w-4 mr-2 text-primary"/>AI Feedback</h5>
+                 <h5 className="text-sm font-medium text-foreground mb-2 flex items-center">AI Feedback</h5>
                  
                  {student.latest_submission.transcription_status === 'completed' && (
                     <div className="space-y-4">
@@ -302,7 +300,7 @@ export default function SubmissionsList({
                                     </div>
                                     
                                                                   <div className="bg-info/10 p-2 rounded">
-                                <p className="text-xs text-info font-medium mb-1">Student's Recitation:</p>
+                                <p className="text-xs text-info font-medium mb-1">Student&apos;s Recitation:</p>
                                       <p className="text-right font-arabic text-sm" dir="rtl">{verse.transcribedText || "No transcription"}</p>
                                     </div>
 
@@ -314,7 +312,7 @@ export default function SubmissionsList({
                                         <div className="space-y-1">
                                           {verse.differences.slice(0, 3).map((diff, diffIndex) => (
                                             <p key={diffIndex} className="text-xs text-orange-700 dark:text-orange-300">
-                                              Word {diff.position}: Expected "{diff.expected}" → Heard "{diff.transcribed}"
+                                              Word {diff.position}: Expected &quot;{diff.expected}&quot; → Heard &quot;{diff.transcribed}&quot;
                                             </p>
                                           ))}
                                           {verse.differences.length > 3 && (

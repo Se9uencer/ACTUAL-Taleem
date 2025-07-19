@@ -71,7 +71,7 @@ export default function SettingsPage() {
         description: "Your preferences have been updated successfully.",
         variant: "default",
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Error saving settings",
         description: "There was a problem saving your preferences.",

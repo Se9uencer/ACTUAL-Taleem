@@ -16,7 +16,7 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<any[]>([])
-  const [recitations, setRecitations] = useState<any[]>([])
+
   const [activeTab, setActiveTab] = useState("all")
 
   useEffect(() => {
@@ -39,7 +39,6 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
 
         if (!assignmentStudents || assignmentStudents.length === 0) {
           setAssignments([])
-          setRecitations([])
           setLoading(false)
           return
         }
@@ -110,7 +109,6 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
         })
 
         setAssignments(processedAssignments)
-        setRecitations(recitationsData)
       } catch (err: any) {
         console.error("Error fetching child progress:", err)
         setError(err.message || "An unexpected error occurred")

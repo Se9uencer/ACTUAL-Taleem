@@ -14,8 +14,8 @@ export function ChildrenList({ children, onViewProgress, selectedChildId }: Chil
   if (children.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500 mb-2">You haven't linked any children yet.</p>
-        <p className="text-sm text-gray-400">Use the form above to link your child's account using their student ID.</p>
+        <p className="text-gray-500 mb-2">You haven&apos;t linked any children yet.</p>
+        <p className="text-sm text-gray-400">Use the form above to link your child&apos;s account using their student ID.</p>
       </div>
     )
   }

@@ -33,7 +33,7 @@ export default function JoinClassPage() {
       const client = createClientComponentClient()
       setSupabase(client)
 
-      async function loadUserData() {
+      const loadUserData = async () => {
         try {
           // Check if user is authenticated
           const { data: sessionData, error: sessionError } = await client.auth.getSession()

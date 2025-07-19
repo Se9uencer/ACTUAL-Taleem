@@ -19,7 +19,8 @@ export default function NewRecitationPage() {
   const [user, setUser] = useState<any>(null)
   const [previousSubmission, setPreviousSubmission] = useState<any>(null)
   const [submittedRecitationId, setSubmittedRecitationId] = useState<string | null>(null)
-  const [transcription, setTranscription] = useState<string | null>(null);
+  const [transcription, setTranscription] = useState<string | null>(null)
+  const [quran, setQuran] = useState<any>(null)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -31,6 +32,16 @@ export default function NewRecitationPage() {
     const loadData = async () => {
       try {
         setLoading(true);
+        
+        // Load Quran data
+        try {
+          const response = await fetch('/quran.json');
+          const quranData = await response.json();
+          setQuran(quranData);
+        } catch (quranError) {
+          console.error("Error loading Quran data:", quranError);
+        }
+
         const { data: sessionData } = await supabase.auth.getSession()
 
         if (!sessionData.session) {
@@ -78,7 +89,7 @@ export default function NewRecitationPage() {
         const { data: enrollment, error: enrollmentError } = await supabase
           .from("class_students")
           .select("*")
-          .eq("class_id", assignmentData.class_id)
+          .eq("class_id", String(assignmentData.class_id))
           .eq("student_id", sessionData.session.user.id)
           .single()
 
@@ -140,73 +151,7 @@ export default function NewRecitationPage() {
     return `${surahNameOnly} - Ayahs ${startAyah}-${endAyah}`;
   }
 
-  // Helper to get the first ayah text for the assignment
-  const [quran, setQuran] = useState<Record<string, any[]> | null>(null);
-  useEffect(() => {
-    if (!quran) {
-      (async () => {
-        try {
-          const res = await fetch('/quran.json');
-          if (res.ok) {
-            const data = await res.json();
-            setQuran(data);
-          } else {
-            setQuran(null);
-          }
-        } catch {
-          setQuran(null);
-        }
-      })();
-    }
-  }, [quran]);
 
-  function getFirstAyahText(assignment: any) {
-    if (!assignment?.surah && !assignment?.surah_name) return null;
-    if (!assignment?.start_ayah) return null;
-    if (!quran) return null;
-
-    // Try to get surah number as number
-    let surahNum: number | null = null;
-    if (typeof assignment.surah === "number") {
-      surahNum = assignment.surah;
-    } else if (typeof assignment.surah === "string") {
-      // Try to parse number from string (e.g., "1. Al-Fatihah")
-      const match = assignment.surah.match(/^(\d+)/);
-      if (match) surahNum = parseInt(match[1], 10);
-    } else if (assignment.surah_name) {
-      const match = assignment.surah_name.match(/^(\d+)/);
-      if (match) surahNum = parseInt(match[1], 10);
-    }
-    if (!surahNum) return (
-      <span className="text-xs text-destructive">Could not determine surah number (got: {String(assignment.surah || assignment.surah_name)})</span>
-    );
-
-    const ayahs = quran?.[String(surahNum)] || quran?.[surahNum];
-    if (!ayahs || !Array.isArray(ayahs)) return (
-      <span className="text-xs text-destructive">No ayahs found for surah {String(surahNum)}</span>
-    );
-
-    // Try to match ayah number as number or string, and check for 'verse', 'ayah', or 'chapter' keys
-    const startAyahNum = typeof assignment.start_ayah === "number" ? assignment.start_ayah : parseInt(assignment.start_ayah, 10);
-    let ayah = ayahs.find((a: any) => {
-      // Support 'verse', 'ayah', and 'chapter' keys
-      const ayahNum = a.verse ?? a.ayah ?? a.chapter;
-      return ayahNum == startAyahNum || String(ayahNum) == String(startAyahNum);
-    });
-    // Fallback: try off-by-one (sometimes data is 0-based)
-    if (!ayah && startAyahNum > 0) {
-      ayah = ayahs.find((a: any) => {
-        const ayahNum = a.verse ?? a.ayah ?? a.chapter;
-        return ayahNum == startAyahNum + 1 || String(ayahNum) == String(startAyahNum + 1);
-      });
-    }
-    if (!ayah) {
-      return (
-        <span className="text-xs text-destructive">Could not find ayah {String(assignment.start_ayah)} in surah {String(surahNum)}</span>
-      );
-    }
-    return ayah.text || null;
-  }
 
   // Helper to get the full assignment ayah text (for the assigned range)
   function getAssignmentAyahsText(assignment: any): string {
@@ -277,7 +222,7 @@ export default function NewRecitationPage() {
           .select("transcription")
           .eq("id", submittedRecitationId)
           .single();
-        if (!error && data && data.transcription) {
+        if (!error && data && typeof data.transcription === 'string') {
           setTranscription(data.transcription);
         } else {
           setTranscription(null);

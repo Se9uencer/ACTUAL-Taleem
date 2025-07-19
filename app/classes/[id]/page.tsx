@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { TaleemLogo } from "@/components/taleem-logo"
 import { createClientComponentClient } from "@/lib/supabase/client"
+import { getStudentCountForClass } from '@/lib/supabase/client';
 import {
   CopyIcon,
   CheckIcon,
@@ -12,8 +13,6 @@ import {
   XIcon,
   UserIcon,
   BookOpenIcon,
-  MailIcon,
-  PhoneIcon,
   CreditCardIcon as IdCardIcon,
   AlertTriangle,
 } from "lucide-react"
@@ -46,18 +45,18 @@ export default function ClassDetailsPage() {
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+    const [user, setUser] = useState<any>(null)
+
   const [supabase, setSupabase] = useState<any>(null)
   const [copied, setCopied] = useState(false)
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null)
   const [showConfirmRemove, setShowConfirmRemove] = useState<string | null>(null)
   const [showStudentProfile, setShowStudentProfile] = useState<string | null>(null)
-  const [showExtraInfo, setShowExtraInfo] = useState<string | null>(null)
   const [studentAssignments, setStudentAssignments] = useState<StudentAssignment[]>([])
   const [loadingAssignments, setLoadingAssignments] = useState(false)
   const [classStudentLinks, setClassStudentLinks] = useState<any[]>([])
   const [missingProfiles, setMissingProfiles] = useState<any[]>([])
+  const [studentCount, setStudentCount] = useState<number>(0);
 
   const router = useRouter()
   const params = useParams()
@@ -91,7 +90,7 @@ export default function ClassDetailsPage() {
           return
         }
 
-        setProfile(profileData)
+
 
         // Fetch class details
         const { data: classDetails, error: classDetailsError } = await client
@@ -138,6 +137,10 @@ export default function ClassDetailsPage() {
           setLoading(false)
           return
         }
+
+        // Count only students with profiles.role === 'student'
+        const count = await getStudentCountForClass(client, classId);
+        setStudentCount(count);
 
         // Separate those with missing profiles
         const missing = classStudents.filter((row: any) => !row.profiles)
@@ -388,7 +391,7 @@ export default function ClassDetailsPage() {
           <div className="p-6">
             <div className="flex items-center mb-6">
               <UsersIcon className="h-5 w-5 text-gray-500 mr-2" />
-              <h3 className="text-lg font-medium text-gray-900">Students ({classStudentLinks.length})</h3>
+              <h3 className="text-lg font-medium text-gray-900">Students ({studentCount})</h3>
             </div>
             {missingProfiles.length > 0 && (
               <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 flex items-center text-yellow-800 rounded">
@@ -453,12 +456,7 @@ export default function ClassDetailsPage() {
                           ) : (
                             <span className="flex-1 text-center px-3 py-1.5 bg-gray-200 text-gray-500 text-sm rounded cursor-not-allowed">No profile</span>
                           )}
-                          <button
-                            onClick={() => setShowExtraInfo(profile ? profile.id : row.student_id)}
-                            className="flex-1 text-center px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
-                          >
-                            Contact Info
-                          </button>
+
                         </div>
                       </div>
                       {/* Confirmation Modal for Removing Student */}

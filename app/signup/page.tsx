@@ -10,6 +10,7 @@ import { TaleemLogo } from "@/components/taleem-logo"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { supabaseConfig } from "@/lib/config"
 import { Card, CardContent } from "@/components/ui/card"
+import { AuthApiError } from "@supabase/supabase-js"
 
 
 export default function SignupPage() {
@@ -23,13 +24,10 @@ export default function SignupPage() {
   const [parentPhone, setParentPhone] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<string[]>([])
+
   const router = useRouter()
 
-  const addDebugInfo = (info: string) => {
-    console.log(info)
-    setDebugInfo((prev) => [...prev, info])
-  }
+
 
   // Generate a unique student ID
   const generateStudentId = () => {
@@ -52,8 +50,6 @@ export default function SignupPage() {
   }
 
   const createProfileDirectly = async (supabase: any, userId: string, userData: any) => {
-    addDebugInfo(`Attempting to create profile directly for user ${userId}`)
-
     try {
       // Generate student ID if role is student
       const studentId = userData.role === "student" ? generateStudentId() : null
@@ -74,21 +70,16 @@ export default function SignupPage() {
       })
 
       if (insertError) {
-        addDebugInfo(`Error creating profile: ${insertError.message}`)
         return false
       }
 
-      addDebugInfo("Profile created successfully")
       return true
     } catch (error: any) {
-      addDebugInfo(`Exception creating profile: ${error.message}`)
       return false
     }
   }
 
   const verifyProfileExists = async (supabase: any, userId: string, userData: any) => {
-    addDebugInfo(`Verifying profile exists for user ${userId}`)
-
     // Check if profile exists
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -97,42 +88,29 @@ export default function SignupPage() {
       .maybeSingle()
 
     if (profileError) {
-      addDebugInfo(`Error checking profile: ${profileError.message}`)
       return false
     }
 
     if (!profile) {
-      addDebugInfo("No profile found, creating one")
       return await createProfileDirectly(supabase, userId, userData)
     }
 
     // Profile exists, check if role is correct
     if (profile.role !== userData.role) {
-      addDebugInfo(`Profile exists but role is ${profile.role}, updating to ${userData.role}`)
-
       const { error: updateError } = await supabase.from("profiles").update({ role: userData.role }).eq("id", userId)
 
       if (updateError) {
-        addDebugInfo(`Error updating profile role: ${updateError.message}`)
         return false
       }
-
-      addDebugInfo("Profile role updated successfully")
-    } else {
-      addDebugInfo(`Profile exists with correct role: ${profile.role}`)
     }
 
     // Check if student_id exists for student role
     if (userData.role === "student" && !profile.student_id) {
-      addDebugInfo("Student profile missing student_id, generating one")
-
       const studentId = generateStudentId()
       const { error: updateError } = await supabase.from("profiles").update({ student_id: studentId }).eq("id", userId)
 
       if (updateError) {
-        addDebugInfo(`Error updating student_id: ${updateError.message}`)
-      } else {
-        addDebugInfo(`Student ID generated and saved: ${studentId}`)
+        // Continue anyway
       }
     }
 
@@ -142,122 +120,67 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate required fields
     if (!email || !password || !firstName || !lastName) {
-      setError("All fields are required")
+      setError("Please fill out all required fields.")
       return
     }
 
     setLoading(true)
     setError(null)
-    setDebugInfo([])
+
+    const supabase = createClientComponentClient()
+    const normalizedEmail = email.toLowerCase().trim()
 
     try {
-      if (!supabaseConfig.isValid()) {
-        throw new Error("Invalid Supabase configuration")
-      }
-
-      const supabase = createClientComponentClient()
-      const normalizedEmail = email.toLowerCase().trim()
-
-      addDebugInfo(`Starting signup process for ${normalizedEmail} with role: ${role}`)
-
-      // Check if email is already in use
-      const { data: existingUser, error: checkError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", normalizedEmail)
-        .maybeSingle()
-
-      if (checkError) {
-        addDebugInfo(`Error checking existing user: ${checkError.message}`)
-      }
-
-      if (existingUser) {
-        setError("This email is already in use. Please use a different email or sign in.")
-        setLoading(false)
-        return
-      }
-
-      // Sign up the user with auto-confirmation
-      addDebugInfo(`Creating auth user with role: ${role}`)
-      const { data, error: signupError } = await supabase.auth.signUp({
+      // Step 1: Sign up the new user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: normalizedEmail,
         password,
         options: {
           data: {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
-            role: role, // Ensure role is passed correctly
+            role,
+            grade: role === "student" ? grade : undefined,
+            parent_email: role === "student" ? parentEmail : undefined,
+            parent_phone: role === "student" ? parentPhone : undefined,
           },
-          // Don't require email verification
-          emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       })
 
-      if (signupError) {
-        addDebugInfo(`Signup error: ${signupError.message}`)
-        throw signupError
+      if (signUpError) {
+        // Handle specific errors, like a user already existing
+        if (signUpError instanceof AuthApiError && signUpError.message.includes("User already registered")) {
+          setError("This email is already registered. Please try logging in.")
+        } else {
+          setError(signUpError.message)
+        }
+        return
       }
 
-      if (!data.user) {
-        addDebugInfo("No user returned from signup")
-        throw new Error("Signup failed")
+      if (!signUpData.user) {
+        setError("Signup was not successful. Please try again.")
+        return
       }
 
-      addDebugInfo(`User created with ID: ${data.user.id}`)
-      addDebugInfo(`User metadata: ${JSON.stringify(data.user.user_metadata)}`)
-
-      // Wait a moment for any triggers to run
-      addDebugInfo("Waiting for database triggers to run...")
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Verify and ensure profile exists
-      const userData = {
-        email: normalizedEmail,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        role: role,
-        grade: grade,
-        parentEmail: parentEmail,
-        parentPhone: parentPhone,
-      }
-
-      const profileCreated = await verifyProfileExists(supabase, data.user.id, userData)
-
-      if (!profileCreated) {
-        addDebugInfo("Failed to verify or create profile, but continuing with login attempt")
-      }
-
-      // Sign in the user directly without email verification
-      addDebugInfo("No session, attempting to sign in")
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      // Step 2: After successful signup, immediately sign in the user
+      // The `handle_new_user` trigger in the DB will create the profile automatically.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
       })
 
       if (signInError) {
-        addDebugInfo(`Sign in error: ${signInError.message}`)
-        throw signInError
+        // If sign-in fails, redirect to login with a success message
+        router.push("/login?message=Account created! Please sign in to continue.")
+        return
       }
 
-      if (signInData.session) {
-        // Successfully signed in, redirect to dashboard
-        addDebugInfo("Sign in successful, redirecting to dashboard")
-
-        // One final check to ensure profile exists
-        await verifyProfileExists(supabase, signInData.user.id, userData)
-
-        router.push("/dashboard")
-      } else {
-        // Redirect to login page with message
-        addDebugInfo("No session after sign in, redirecting to login page")
-        router.push("/login?message=Account created successfully! Please sign in.")
-      }
+      // Step 3: Redirect to the dashboard on successful sign-in
+      router.push("/dashboard")
     } catch (error: any) {
-      console.error("Signup error:", error)
-      setError(error.message || "An error occurred during signup")
-      addDebugInfo(`Caught error: ${error.message}`)
+      console.error("Unexpected Signup Error:", error)
+      setError("An unexpected error occurred. Please try again.")
     } finally {
       setLoading(false)
     }
