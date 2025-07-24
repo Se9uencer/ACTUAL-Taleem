@@ -5,7 +5,8 @@ import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { TaleemLogo } from "@/components/taleem-logo"
 import { createClientComponentClient } from "@/lib/supabase/client"
-import { getStudentCountForClass } from '@/lib/supabase/client';
+import { getStudentCountForClass } from '@/lib/supabase/client'
+
 import {
   CopyIcon,
   CheckIcon,
@@ -46,6 +47,7 @@ interface StudentAssignment {
 }
 
 export default function ClassDetailsPage() {
+  
   const [classData, setClassData] = useState<any>(null)
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [loading, setLoading] = useState(true)
@@ -678,24 +680,4 @@ export default function ClassDetailsPage() {
   )
 }
 
-// DEV ONLY: Helper to validate class_students consistency
-if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
-  (window as any).validateClassStudents = async (classId: string) => {
-    const client = createClientComponentClient()
-    const { data: classStudents } = await client
-      .from("class_students")
-      .select("*, profiles:profiles(*)")
-      .eq("class_id", classId)
-    if (!classStudents) {
-      console.warn("[DEV] No class_students found for this class.")
-      return { classStudents: [], missing: [] }
-    }
-    const missing = classStudents.filter((row: any) => !row.profiles)
-    if (missing.length > 0) {
-      console.warn("[DEV] Missing profiles for class_students:", missing)
-    } else {
-      console.log("[DEV] All class_students have valid profiles.")
-    }
-    return { classStudents, missing }
-  }
-}
+  return (

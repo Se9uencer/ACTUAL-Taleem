@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import { SettingsProvider } from "@/contexts/settings-context"
+import { AuthProvider } from "@/contexts/auth-context"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as Sonner } from "sonner"
 import { ThemeScript } from "./theme-script"
@@ -23,7 +24,9 @@ export default function RootLayout({
         <ThemeScript />
       </head>
       <body>
-        <SettingsProvider>{children}</SettingsProvider>
+        <AuthProvider>
+          <SettingsProvider>{children}</SettingsProvider>
+        </AuthProvider>
         <Toaster />
         <Sonner />
       </body>

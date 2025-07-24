@@ -1,36 +1,32 @@
-"use server"
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
-import { supabaseConfig } from "../config"
+export async function createClient() {
+  const cookieStore = await cookies()
 
-// Change to async function to comply with Server Actions requirements
-export const createServerClient = async () => {
-  try {
-    const cookieStore = cookies()
-
-    // Check if we have valid configuration
-    if (!supabaseConfig.isValid()) {
-      console.error("Invalid Supabase configuration in server client")
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
     }
-
-    // Ensure we have values for URL and key
-    if (!supabaseConfig.url || !supabaseConfig.anonKey) {
-      throw new Error("Missing Supabase URL or anon key in server client")
-    }
-
-    return createClient(supabaseConfig.url, supabaseConfig.anonKey)
-  } catch (error) {
-    console.error("Error creating Supabase server client:", error)
-    throw new Error("Failed to initialize Supabase server client. Please check your configuration.")
-  }
+  )
 }
 
-// Create a server client using the service role key. This client bypasses RLS
-// policies and should only be used for trusted backend operations.
-export const createServiceRoleClient = async () => {
-  if (!supabaseConfig.url || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Missing Supabase service role configuration')
-  }
-  return createClient(supabaseConfig.url, process.env.SUPABASE_SERVICE_ROLE_KEY)
-}
+// Legacy function name for backward compatibility
+export const createServerComponentClient = createClient

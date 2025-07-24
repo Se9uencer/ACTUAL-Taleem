@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { TaleemLogo } from "@/components/taleem-logo"
 import { Bell, ChevronDown, User, LogOut, Settings, Book, Home, Users } from "lucide-react"
-import { createClientComponentClient } from "@/lib/supabase/client"
+import { useAuth } from "@/contexts/auth-context"
 
 interface AcademicHeaderProps {
   user: any
@@ -15,11 +15,10 @@ export function AcademicHeader({ user }: AcademicHeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const pathname = usePathname()
+  const { signOut } = useAuth()
 
   const handleSignOut = async () => {
-    const supabase = createClientComponentClient()
-    await supabase.auth.signOut()
-    window.location.href = "/login"
+    await signOut()
   }
 
   const isActive = (path: string) => {
@@ -111,39 +110,18 @@ export function AcademicHeader({ user }: AcademicHeaderProps) {
             {/* Notifications */}
             <div className="relative">
               <button
-                className="p-1 rounded-full text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="p-1 rounded-full text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 <span className="sr-only">View notifications</span>
                 <Bell className="h-6 w-6" />
               </button>
 
-              {/* Notification indicator */}
-              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-background"></span>
-
-              {/* Notifications dropdown */}
               {notificationsOpen && (
                 <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-popover ring-1 ring-black ring-opacity-5 z-50">
                   <div className="py-1" role="menu" aria-orientation="vertical">
-                    <div className="px-4 py-2 border-b border-border">
-                      <h3 className="text-sm font-medium text-foreground">Notifications</h3>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      <div className="px-4 py-3 hover:bg-muted border-b border-border">
-                        <p className="text-sm font-medium text-foreground">New assignment added</p>
-                        <p className="text-xs text-muted-foreground mt-1">Quran Memorization - Due in 3 days</p>
-                      </div>
-                      <div className="px-4 py-3 hover:bg-muted">
-                        <p className="text-sm font-medium text-foreground">Feedback received</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Your teacher has provided feedback on your recitation
-                        </p>
-                      </div>
-                    </div>
-                    <div className="px-4 py-2 border-t border-border">
-                      <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">
-                        View all notifications
-                      </a>
+                    <div className="px-4 py-2 text-sm text-muted-foreground">
+                      No new notifications
                     </div>
                   </div>
                 </div>
@@ -153,17 +131,14 @@ export function AcademicHeader({ user }: AcademicHeaderProps) {
             {/* Profile dropdown */}
             <div className="relative">
               <button
-                className="flex items-center space-x-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary rounded-full"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 <span className="sr-only">Open user menu</span>
-                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                  {user?.first_name ? user.first_name.charAt(0) : user?.email?.charAt(0).toUpperCase()}
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
                 </div>
-                <span className="hidden md:block text-sm font-medium text-foreground">
-                  {user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email}
-                </span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="ml-1 h-4 w-4 text-muted-foreground" />
               </button>
 
               {userMenuOpen && (

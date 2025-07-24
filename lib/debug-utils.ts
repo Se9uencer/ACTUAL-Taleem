@@ -1,3 +1,5 @@
+import { useIsClient } from '@/hooks/use-is-client'
+
 /**
  * Debug utility functions for conditional debug box rendering
  */
@@ -12,9 +14,12 @@ export function isDebugMode(): boolean {
 }
 
 /**
- * React hook-friendly debug mode checker
+ * React hook-friendly debug mode checker that prevents hydration mismatches
  * Use this in components for conditional debug box rendering
  */
 export function useDebugMode(): boolean {
-  return isDebugMode()
+  const isClient = useIsClient()
+  
+  // Only show debug mode after hydration to prevent mismatches
+  return isClient && isDebugMode()
 } 
