@@ -467,7 +467,7 @@ export function RecitationRecorder({ assignmentId, studentId, onRecitationSubmit
                       Recording Not Available
                     </Button>
                     {isIOS && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 text-center">
+                      <p className="text-xs text-amber-600 mt-1 text-center">
                         Direct recording not supported on iOS Safari
                       </p>
                     )}
@@ -496,8 +496,8 @@ export function RecitationRecorder({ assignmentId, studentId, onRecitationSubmit
                 <p>Supported formats: .mp3, .wav, .m4a, .aac, .ogg, .webm</p>
                 <p>Maximum file size: 10MB. Minimum duration: 0.5 seconds.</p>
                 {isIOS ? (
-                  <div className="text-xs mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                    <p className="font-medium text-blue-700 dark:text-blue-300">📱 iOS Instructions:</p>
+                                <div className="text-xs mt-2 p-2 bg-blue-50 rounded-md">
+                <p className="font-medium text-blue-700">📱 iOS Instructions:</p>
                     <p className="mt-1">1. Record audio using Voice Memos app</p>
                     <p>2. Save to Files app</p>
                     <p>3. Tap "Upload Audio" to select your recording</p>

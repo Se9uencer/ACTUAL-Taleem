@@ -19,6 +19,7 @@ import {
 import { formatDateTimePST, isPastDuePST } from "@/lib/date-utils"
 import SubmissionsList from "./submissions-list"
 import { useAssignmentDeletion } from "@/hooks/use-assignment-deletion"
+import { DeleteAssignmentModal } from "@/components/ui/delete-assignment-modal"
 
 interface Assignment {
   id: string
@@ -45,6 +46,7 @@ export default function AssignmentDetailsPage() {
   const [classStudents, setClassStudents] = useState<any[]>([])
   const [assignedStudents, setAssignedStudents] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const { deleteAssignment, isDeleting } = useAssignmentDeletion()
 
   const router = useRouter()
@@ -85,12 +87,6 @@ export default function AssignmentDetailsPage() {
           return
         }
 
-        console.log('=== ASSIGNMENT DETAILS DEBUG ===')
-        console.log('Raw assignment data:', assignmentData)
-        console.log('Raw due_date from DB:', assignmentData.due_date)
-        console.log('due_date type:', typeof assignmentData.due_date)
-        console.log('due_date as Date:', new Date(assignmentData.due_date as string))
-        console.log('=== END DEBUG ===')
         setAssignment(assignmentData as unknown as Assignment);
 
         // Get class name
@@ -218,29 +214,26 @@ export default function AssignmentDetailsPage() {
   }
 
   // Handle assignment deletion
-  const handleDeleteAssignment = async () => {
+  const handleDeleteClick = () => {
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
     if (!assignment) return
-
-    const assignmentTitle = assignment.title ||
-      (assignment.surah_name && assignment.start_ayah && assignment.end_ayah
-        ? generateAssignmentTitle(assignment.surah_name, assignment.start_ayah, assignment.end_ayah)
-        : assignment.surah)
-
-    // Confirm deletion
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${assignmentTitle}"? This action cannot be undone and will remove all associated submissions.`
-    )
-
-    if (!confirmed) {
-      return
-    }
 
     // Attempt deletion
     const success = await deleteAssignment(assignment.id)
 
     if (success) {
+      setIsDeleteModalOpen(false)
       // Redirect to the class page after successful deletion
       router.push(`/classes/${assignment.class_id}`)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    if (!isDeleting) {
+      setIsDeleteModalOpen(false)
     }
   }
 
@@ -259,15 +252,7 @@ export default function AssignmentDetailsPage() {
 
   // Format date to display in a readable format
   const formatDate = (dateString: string) => {
-    console.log('=== FORMAT DATE DEBUG ===')
-    console.log('formatDate input:', dateString)
-    console.log('formatDate input type:', typeof dateString)
-    console.log('formatDate as Date object:', new Date(dateString))
-    console.log('formatDate Date.toISOString():', new Date(dateString).toISOString())
-    const result = formatDateTimePST(dateString)
-    console.log('formatDateTimePST result:', result)
-    console.log('=== END FORMAT DEBUG ===')
-    return result
+    return formatDateTimePST(dateString)
   }
 
   // Check if an assignment is past due
@@ -343,7 +328,7 @@ export default function AssignmentDetailsPage() {
               Edit Assignment
             </Link>
             <button
-              onClick={handleDeleteAssignment}
+              onClick={handleDeleteClick}
               disabled={isDeleting}
               className="text-red-600 hover:text-red-800 font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete assignment"
@@ -409,7 +394,29 @@ export default function AssignmentDetailsPage() {
                   <h3 className="font-medium text-purple-800">Assigned To</h3>
                 </div>
                 <p className="text-3xl font-bold text-purple-900 mt-2">{studentCount}</p>
-                <p className="text-sm text-purple-700">students</p>
+                <p className="text-sm text-purple-700">
+                  {assignedStudents.length === classStudents.length ? "All students (at creation)" : "Selected students"}
+                </p>
+                {assignedStudents.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {classStudents
+                      .filter(student => assignedStudents.includes(student.id))
+                      .slice(0, 3)
+                      .map(student => (
+                        <span
+                          key={student.id}
+                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                        >
+                          {student.first_name} {student.last_name}
+                        </span>
+                      ))}
+                    {assignedStudents.length > 3 && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        +{assignedStudents.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg">
@@ -427,51 +434,7 @@ export default function AssignmentDetailsPage() {
             </div>
           </div>
 
-          {/* DEBUG BOX */}
-          <div className="p-6 border-t bg-yellow-50">
-            <h3 className="text-lg font-semibold mb-4 text-yellow-800">🐛 Debug Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="bg-white p-3 rounded border">
-                <h4 className="font-medium text-gray-800 mb-2">Raw Database Value</h4>
-                <p className="text-gray-600 break-words">
-                  <strong>due_date:</strong> {assignment.due_date}
-                </p>
-                <p className="text-gray-600">
-                  <strong>Type:</strong> {typeof assignment.due_date}
-                </p>
-              </div>
-              
-              <div className="bg-white p-3 rounded border">
-                <h4 className="font-medium text-gray-800 mb-2">Date Object Parsing</h4>
-                <p className="text-gray-600 break-words">
-                  <strong>new Date():</strong> {new Date(assignment.due_date).toString()}
-                </p>
-                <p className="text-gray-600 break-words">
-                  <strong>toISOString():</strong> {new Date(assignment.due_date).toISOString()}
-                </p>
-              </div>
-              
-              <div className="bg-white p-3 rounded border">
-                <h4 className="font-medium text-gray-800 mb-2">Formatted Output</h4>
-                <p className="text-gray-600">
-                  <strong>formatDateTimePST:</strong> {formatDate(assignment.due_date)}
-                </p>
-              </div>
-              
-              <div className="bg-white p-3 rounded border">
-                <h4 className="font-medium text-gray-800 mb-2">Time Zone Info</h4>
-                <p className="text-gray-600">
-                  <strong>Browser TZ:</strong> {Intl.DateTimeFormat().resolvedOptions().timeZone}
-                </p>
-                <p className="text-gray-600">
-                  <strong>UTC Hours:</strong> {new Date(assignment.due_date).getUTCHours()}
-                </p>
-                <p className="text-gray-600">
-                  <strong>Local Hours:</strong> {new Date(assignment.due_date).getHours()}
-                </p>
-              </div>
-            </div>
-          </div>
+
 
           <div className="p-6">
             <h3 className="text-xl font-semibold mb-6">Student Submissions</h3>
@@ -479,6 +442,23 @@ export default function AssignmentDetailsPage() {
           </div>
         </div>
       </main>
+
+      {assignment && (
+        <DeleteAssignmentModal
+          isOpen={isDeleteModalOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          assignmentTitle={
+            assignment.title ||
+            (assignment.surah_name && assignment.start_ayah && assignment.end_ayah
+              ? generateAssignmentTitle(assignment.surah_name, assignment.start_ayah, assignment.end_ayah)
+              : assignment.surah)
+          }
+          submissionCount={submissionCount}
+          studentCount={studentCount}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   )
 }

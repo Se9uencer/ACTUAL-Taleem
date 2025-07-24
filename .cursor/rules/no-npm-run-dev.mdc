@@ -1,0 +1,18 @@
+---
+description: Optimize development workflow by preventing redundant `npm run dev` calls and using on-screen debug boxes instead of relying solely on console logs. This improves performance, reduces clutter, and makes debugging easier by displaying variable values directly in the UI.
+globs: - "**/*"
+alwaysApply: true
+---
+Whenever you're working in this project, follow these custom rules:
+
+1. **Do NOT run `npm run dev` in a new terminal** every time.
+   - Instead, reuse the existing development server if it's already running.
+   - Only suggest restarting it if there are critical build errors or config changes that require it.
+
+2. When debugging, use **visual on-screen debugging boxes**:
+   - Inject lightweight UI boxes or overlays that display key variable values (e.g. `user.id`, `theme_accent_color`, `assignedStudents.length`, etc.).
+   - Style them to be unobtrusive (e.g. bottom corner or floating sidebar).
+   - This allows me to screenshot and show you exactly what values are being passed or rendered without checking the console or logs.
+
+3. You may suggest deleting the debug boxes after the issue is fixed to clean up the UI, but don’t remove them prematurely.
+

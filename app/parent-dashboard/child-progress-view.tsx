@@ -6,7 +6,8 @@ import { formatDatePST } from "@/lib/date-utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertCircle, BookOpen, Calendar, CheckCircle, Clock, XCircle, School } from "lucide-react"
-import { RecitationAudioPlayer } from "@/components/recitation-audio-player";
+import { RecitationAudioPlayer } from "@/components/recitation-audio-player"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface ChildProgressViewProps {
   childId: string
@@ -172,7 +173,7 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+        <div className={`w-8 h-8 ${dynamicAccent.spinner.ring} rounded-full animate-spin`}></div>
       </div>
     )
   }
@@ -244,7 +245,7 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
 
                     <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                       <div className="flex items-center gap-1.5">
-                        <BookOpen className="h-4 w-4 text-purple-500" />
+                        <BookOpen className={`h-4 w-4 ${dynamicAccent.icon.primary}`} />
                         <span>
                           {assignment.surah_name
                             ? `${assignment.surah_name.split(" (")[0].replace(/^\d+\.\s+/, "")}`
@@ -256,13 +257,13 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="h-4 w-4 text-purple-500" />
+                        <Calendar className={`h-4 w-4 ${dynamicAccent.icon.primary}`} />
                         <span>Due: {formatDatePST(assignment.due_date)}</span>
                       </div>
 
                       {assignment.classes && (
                         <div className="flex items-center gap-1.5">
-                          <School className="h-4 w-4 text-purple-500" />
+                          <School className={`h-4 w-4 ${dynamicAccent.icon.primary}`} />
                           <span>Class: {assignment.classes.name}</span>
                         </div>
                       )}
@@ -296,7 +297,7 @@ export function ChildProgressView({ childId }: ChildProgressViewProps) {
                               <h5 className="text-sm font-medium">Teacher Feedback</h5>
                               <a
                                 href={`/parent-dashboard/recitation/${assignment.latestRecitation.id}`}
-                                className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                                className={`text-xs ${dynamicAccent.link.primary} font-medium`}
                               >
                                 View Details →
                               </a>

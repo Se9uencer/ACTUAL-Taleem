@@ -15,14 +15,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Moon, Sun, Monitor, LogOut, User, Mail, Shield, FileText, Check } from "lucide-react"
+import { LogOut, User, Mail, Shield, FileText } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { AccentColorSelector } from "@/components/ui/accent-color-selector"
 
 export default function SettingsPage() {
-  const { theme, setTheme, colorAccent, setColorAccent, saveSettingsToSupabase, resolvedTheme } = useSettings()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [termsOpen, setTermsOpen] = useState(false)
   const router = useRouter()
@@ -62,25 +61,7 @@ export default function SettingsPage() {
     fetchUserData()
   }, [router])
 
-  const handleSaveSettings = async () => {
-    setSaving(true)
-    try {
-      await saveSettingsToSupabase()
-      toast({
-        title: "Settings saved",
-        description: "Your preferences have been updated successfully.",
-        variant: "default",
-      })
-    } catch {
-      toast({
-        title: "Error saving settings",
-        description: "There was a problem saving your preferences.",
-        variant: "destructive",
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
+
 
   const handleSignOut = async () => {
     try {
@@ -106,177 +87,14 @@ export default function SettingsPage() {
           {/* Theme & Appearance */}
           <Card className="border border-border bg-card shadow-sm">
             <CardHeader className="border-b border-border">
-              <CardTitle className="text-card-foreground">Theme & Appearance</CardTitle>
-              <CardDescription className="text-muted-foreground">Customize how Taleem looks and feels</CardDescription>
+              <CardTitle className="text-card-foreground">Appearance</CardTitle>
+              <CardDescription className="text-muted-foreground">Customize your accent color</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Theme Selection */}
-              <div>
-                <h3 className="text-sm font-medium text-foreground mb-4">Theme</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div
-                    className={`relative rounded-lg border ${
-                      theme === "light"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setTheme("light")}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <Sun className="h-5 w-5 text-foreground" />
-                      {theme === "light" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="h-24 rounded-md bg-card border border-border mb-2 flex items-center justify-center">
-                      <div className="w-12 h-4 bg-foreground rounded"></div>
-                    </div>
-                    <p className="text-sm font-medium text-foreground">Light</p>
-                    <p className="text-xs text-muted-foreground">Light background with dark text</p>
-                  </div>
+              {/* Accent Color Selection */}
+              <AccentColorSelector />
 
-                  <div
-                    className={`relative rounded-lg border ${
-                      theme === "dark"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setTheme("dark")}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <Moon className="h-5 w-5 text-foreground" />
-                      {theme === "dark" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="h-24 rounded-md bg-background border border-border mb-2 flex items-center justify-center">
-                      <div className="w-12 h-4 bg-muted rounded"></div>
-                    </div>
-                    <p className="text-sm font-medium text-foreground">Dark</p>
-                    <p className="text-xs text-muted-foreground">Dark background with light text</p>
-                  </div>
 
-                  <div
-                    className={`relative rounded-lg border ${
-                      theme === "system"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setTheme("system")}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <Monitor className="h-5 w-5 text-foreground" />
-                      {theme === "system" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="h-24 rounded-md bg-gradient-to-r from-card to-background border border-border mb-2 flex items-center justify-center">
-                      <div className="w-12 h-4 bg-gradient-to-r from-foreground to-muted rounded"></div>
-                    </div>
-                    <p className="text-sm font-medium text-foreground">System</p>
-                    <p className="text-xs text-muted-foreground">Follows your device settings</p>
-                    <p className="text-xs text-primary mt-1">
-                      Currently: {resolvedTheme === "dark" ? "Dark" : "Light"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Color Accent Selection */}
-              <div className="pt-4 border-t border-border">
-                <h3 className="text-sm font-medium text-foreground mb-4">Color Accent</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div
-                    className={`relative rounded-lg border ${
-                      colorAccent === "purple"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setColorAccent("purple")}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="color-sample color-sample-purple"></div>
-                      {colorAccent === "purple" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-foreground">Purple</p>
-                  </div>
-
-                  <div
-                    className={`relative rounded-lg border ${
-                      colorAccent === "blue"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setColorAccent("blue")}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="color-sample color-sample-blue"></div>
-                      {colorAccent === "blue" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-foreground">Blue</p>
-                  </div>
-
-                  <div
-                    className={`relative rounded-lg border ${
-                      colorAccent === "teal"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setColorAccent("teal")}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="color-sample color-sample-teal"></div>
-                      {colorAccent === "teal" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-foreground">Teal</p>
-                  </div>
-
-                  <div
-                    className={`relative rounded-lg border ${
-                      colorAccent === "green"
-                        ? "border-primary ring-2 ring-primary ring-offset-2"
-                        : "border-border hover:border-primary/50"
-                    } p-4 cursor-pointer transition-all`}
-                    onClick={() => setColorAccent("green")}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="color-sample color-sample-green"></div>
-                      {colorAccent === "green" && (
-                        <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-foreground">Green</p>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleSaveSettings}
-                disabled={saving}
-                className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {saving ? "Saving..." : "Save Preferences"}
-              </Button>
             </CardContent>
           </Card>
 

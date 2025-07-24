@@ -1,5 +1,15 @@
-// Recitation: represents a recitation record in the database
-export interface Recitation {
+import { Tables } from './supabase'
+
+// Type aliases for easier usage
+export type Profile = Tables<'profiles'>
+export type Recitation = Tables<'recitations'>
+export type Assignment = Tables<'assignments'>
+export type Class = Tables<'classes'>
+export type Feedback = Tables<'feedback'>
+
+// Legacy Recitation interface for backward compatibility
+// You may want to migrate to the Supabase types gradually
+export interface LegacyRecitation {
   id: string;
   student_id: string;
   assignment_id: string;
@@ -11,19 +21,25 @@ export interface Recitation {
   updated_at: string;
 }
 
-// Assignment: represents an assignment record
-export interface Assignment {
+// Legacy Assignment interface for backward compatibility
+// You may want to migrate to the Supabase types gradually
+export interface LegacyAssignment {
   id: string;
   class_id: string;
+  teacher_id: string;
   title: string;
-  description: string;
+  description?: string;
+  surah_name: string;
+  start_ayah: number;
+  end_ayah: number;
   due_date: string;
   created_at: string;
   updated_at: string;
 }
 
-// Feedback: represents feedback on a recitation
-export interface Feedback {
+// Legacy Feedback interface for backward compatibility
+// You may want to migrate to the Supabase types gradually
+export interface LegacyFeedback {
   id: string;
   recitation_id: string;
   teacher_id: string;

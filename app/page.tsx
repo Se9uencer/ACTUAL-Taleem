@@ -26,11 +26,11 @@ export default function MarketingHome() {
         {/* Glowing Background Effects */}
         <div className="absolute inset-0 -z-10">
           {/* Glowing Orbs */}
-          <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-gradient-to-tr from-primary/40 via-purple-500/30 to-blue-400/30 rounded-full blur-3xl animate-pulse-slow" />
+          <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-gradient-to-tr from-primary/40 via-[var(--primary)]/30 to-blue-400/30 rounded-full blur-3xl animate-pulse-slow" />
           <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-gradient-to-br from-green-400/30 via-primary/30 to-blue-500/30 rounded-full blur-3xl animate-pulse-slower" />
           <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-gradient-to-tl from-yellow-400/20 via-pink-500/20 to-primary/20 rounded-full blur-3xl opacity-70 animate-pulse-slowest" style={{ transform: 'translate(-50%, -50%)' }} />
           {/* Overlay for readability */}
-          <div className="absolute inset-0 bg-background/70 dark:bg-background/80" />
+          <div className="absolute inset-0 bg-background/70" />
         </div>
         <div className="relative z-10 flex flex-col items-center gap-4">
           <TaleemLogo className="h-14 w-14 text-primary mb-2" />
@@ -52,7 +52,7 @@ export default function MarketingHome() {
         </div>
         {/* Stats Bar */}
         <div className="absolute left-1/2 bottom-8 -translate-x-1/2 w-full max-w-3xl px-4 z-20">
-          <div className="flex flex-col sm:flex-row justify-center gap-6 bg-background/80 dark:bg-background/90 rounded-2xl shadow-lg border border-border backdrop-blur-md py-4 px-6">
+          <div className="flex flex-col sm:flex-row justify-center gap-6 bg-background/80 rounded-2xl shadow-lg border border-border backdrop-blur-md py-4 px-6">
             <StatItem value="1000+" label="Students empowered" />
             <StatItem value="AI" label="Quran recitation feedback" />
             <StatItem value="3" label="Roles: Student, Teacher, Parent" />

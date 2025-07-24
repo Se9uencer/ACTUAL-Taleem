@@ -8,6 +8,8 @@ import { CalendarIcon, CheckCircleIcon, XCircleIcon, ClockIcon, UsersIcon, Trash
 import { formatDatePST, isPastDuePST } from "@/lib/date-utils"
 import { getStudentCountForAssignment } from '@/lib/supabase/client'
 import { useAssignmentDeletion } from "@/hooks/use-assignment-deletion"
+import { DeleteAssignmentModal } from "@/components/ui/delete-assignment-modal"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface Assignment {
   id: string
@@ -28,6 +30,10 @@ export default function AssignmentsList({ classId }: { classId: string }) {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteModalData, setDeleteModalData] = useState<{
+    isOpen: boolean
+    assignment: Assignment | null
+  }>({ isOpen: false, assignment: null })
   const { deleteAssignment, isDeleting } = useAssignmentDeletion()
 
   useEffect(() => {
@@ -91,26 +97,33 @@ export default function AssignmentsList({ classId }: { classId: string }) {
   }, [classId])
 
   // Handle assignment deletion
-  const handleDeleteAssignment = async (assignmentId: string, assignmentTitle: string) => {
-    // Confirm deletion
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${assignmentTitle}"? This action cannot be undone and will remove all associated submissions.`
-    )
+  const handleDeleteClick = (assignment: Assignment) => {
+    setDeleteModalData({ isOpen: true, assignment })
+  }
 
-    if (!confirmed) {
-      return
-    }
+  const handleDeleteConfirm = async () => {
+    const assignment = deleteModalData.assignment
+    if (!assignment) return
 
     // Optimistically remove from UI
     const originalAssignments = [...assignments]
-    setAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId))
+    setAssignments(prev => prev.filter(a => a.id !== assignment.id))
 
     // Attempt deletion
-    const success = await deleteAssignment(assignmentId)
+    const success = await deleteAssignment(assignment.id)
 
-    if (!success) {
+    if (success) {
+      setDeleteModalData({ isOpen: false, assignment: null })
+    } else {
       // Restore the assignment if deletion failed
       setAssignments(originalAssignments)
+      setDeleteModalData({ isOpen: false, assignment: null })
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    if (!isDeleting) {
+      setDeleteModalData({ isOpen: false, assignment: null })
     }
   }
 
@@ -140,7 +153,7 @@ export default function AssignmentsList({ classId }: { classId: string }) {
   if (loading) {
     return (
       <div className="text-center py-8">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-purple-500 border-r-transparent"></div>
+        <div className={`inline-block h-8 w-8 animate-spin rounded-full ${dynamicAccent.spinner.ring}`}></div>
         <p className="mt-2 text-gray-600">Loading assignments...</p>
       </div>
     )
@@ -160,7 +173,7 @@ export default function AssignmentsList({ classId }: { classId: string }) {
         <p className="text-gray-500 mb-4">No assignments created for this class yet.</p>
         <Link
           href={`/assignments/new?class=${classId}`}
-          className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700"
+          className={`${dynamicAccent.button.primary} px-4 py-2 rounded-md text-sm font-medium`}
         >
           Create First Assignment
         </Link>
@@ -230,19 +243,21 @@ export default function AssignmentsList({ classId }: { classId: string }) {
                   <span className="text-sm text-gray-600">{assignment.submission_count || 0} submissions</span>
                 </div>
                 <div className="flex items-center">
-                  <UsersIcon className="h-4 w-4 text-purple-500 mr-1" />
-                  <span className="text-sm text-gray-600">{assignment.student_count || 0} students assigned</span>
+                  <UsersIcon className={`h-4 w-4 ${dynamicAccent.icon.primary} mr-1`} />
+                  <span className="text-sm text-gray-600">
+                    {assignment.student_count || 0} students assigned
+                  </span>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
                 <Link
                   href={`/assignments/${assignment.id}`}
-                  className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                  className={`${dynamicAccent.link.primary} text-sm font-medium`}
                 >
                   View Details
                 </Link>
                 <button
-                  onClick={() => handleDeleteAssignment(assignment.id, assignmentTitle)}
+                  onClick={() => handleDeleteClick(assignment)}
                   disabled={isDeleting}
                   className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Delete assignment"
@@ -254,6 +269,23 @@ export default function AssignmentsList({ classId }: { classId: string }) {
           </div>
         )
       })}
+
+      {deleteModalData.assignment && (
+        <DeleteAssignmentModal
+          isOpen={deleteModalData.isOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          assignmentTitle={
+            deleteModalData.assignment.title ||
+            (deleteModalData.assignment.surah_name && deleteModalData.assignment.start_ayah && deleteModalData.assignment.end_ayah
+              ? generateAssignmentTitle(deleteModalData.assignment.surah_name, deleteModalData.assignment.start_ayah, deleteModalData.assignment.end_ayah)
+              : deleteModalData.assignment.surah)
+          }
+          submissionCount={deleteModalData.assignment.submission_count || 0}
+          studentCount={deleteModalData.assignment.student_count || 0}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   )
 }

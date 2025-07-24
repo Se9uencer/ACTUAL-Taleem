@@ -10,9 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, Users, BookOpen, CheckCircle, Trash2, XCircle, School, User } from "lucide-react"
 import { formatDatePST } from "@/lib/date-utils"
 import { useAssignmentDeletion } from "@/hooks/use-assignment-deletion"
+import { isDebugMode } from "@/lib/debug-utils"
+import { DeleteAssignmentModal } from "@/components/ui/delete-assignment-modal"
 import { TeacherDashboard } from "./teacher-dashboard"
 import { StudentDashboard } from "./student-dashboard"
 import { ParentDashboard } from "./parent-dashboard"
+import { ClassDeletionBanner } from "@/components/ui/class-deletion-banner"
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null)
@@ -24,27 +27,62 @@ export default function DashboardPage() {
   const [showLateAlert, setShowLateAlert] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteModalData, setDeleteModalData] = useState<{
+    isOpen: boolean
+    assignment: any | null
+  }>({ isOpen: false, assignment: null })
   const { deleteAssignment, isDeleting } = useAssignmentDeletion()
+
+  // Debug state
+  const [debugData, setDebugData] = useState<string[]>([])
+  const [dashboardTiming, setDashboardTiming] = useState<string[]>([])
+
+  const addDebug = (message: string) => {
+    const timestamp = new Date().toISOString()
+    const debugMsg = `${timestamp}: ${message}`
+    setDebugData(prev => [...prev, debugMsg])
+    console.log(`[Dashboard] ${debugMsg}`)
+  }
+
+  const addTiming = (message: string) => {
+    const timestamp = new Date().toISOString()
+    const timingMsg = `${timestamp}: ${message}`
+    setDashboardTiming(prev => [...prev, timingMsg])
+    console.log(`[DashTiming] ${timingMsg}`)
+  }
 
   const router = useRouter()
 
   const loadData = useCallback(async () => {
+    addDebug('🏠 Dashboard loadData started')
+    addTiming('⏱️ Dashboard data loading initiated')
+
     // Add a timeout for the loading process
     const timeout = setTimeout(() => {
+      addDebug('⏰ Dashboard loading timeout reached (10s)')
+      addTiming('⏱️ Dashboard loading timed out')
       setError("The dashboard is taking a long time to load. Please try refreshing the page.")
       setLoading(false)
     }, 10000) // 10-second timeout
 
     try {
+      addDebug('🔧 Creating Supabase client in dashboard...')
       const supabase = createClientComponentClient()
+      
+      addDebug('🔍 Getting session in dashboard...')
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
+        addDebug('❌ Dashboard: No session found, redirecting to login')
+        addTiming('⏱️ Dashboard redirecting - no session')
         clearTimeout(timeout)
         router.push("/login")
         return
       }
 
+      addDebug(`✅ Dashboard session confirmed for user: ${session.user.email}`)
+      addTiming('⏱️ Loading user profile...')
+      
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -52,21 +90,34 @@ export default function DashboardPage() {
         .single()
 
       if (profileError || !profileData) {
+        addDebug(`❌ Dashboard profile error: ${profileError?.message || 'No profile data'}`)
+        addTiming('⏱️ Dashboard profile loading failed')
         setError("Failed to load your profile. Please refresh the page.")
         return
       }
 
+      addDebug(`✅ Dashboard profile loaded: Role=${profileData.role}, Name=${profileData.first_name}`)
       setProfile(profileData)
 
       if (profileData.role === "teacher") {
+        addDebug('📚 Loading teacher-specific data...')
+        addTiming('⏱️ Starting teacher data load')
         await loadTeacherData(supabase, session.user.id)
+        addTiming('⏱️ Teacher data load completed')
       } else if (profileData.role === "student") {
+        addDebug('🎓 Loading student-specific data...')
+        addTiming('⏱️ Starting student data load')
         await loadStudentData(supabase, session.user.id)
+        addTiming('⏱️ Student data load completed')
       }
     } catch (error: any) {
+      addDebug(`💥 Dashboard loading error: ${error.message || error}`)
+      addTiming('⏱️ Dashboard loading failed with error')
       console.error("Error loading dashboard:", error)
       setError("An unexpected error occurred while loading the dashboard.")
     } finally {
+      addDebug('🏁 Dashboard loading process completed')
+      addTiming('⏱️ Dashboard loading finalized')
       clearTimeout(timeout)
       setLoading(false)
     }
@@ -352,26 +403,33 @@ export default function DashboardPage() {
   }
 
   // Handle assignment deletion
-  const handleDeleteAssignment = async (assignmentId: string, assignmentTitle: string) => {
-    // Confirm deletion
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${assignmentTitle}"? This action cannot be undone and will remove all associated submissions.`
-    )
+  const handleDeleteClick = (assignment: any) => {
+    setDeleteModalData({ isOpen: true, assignment })
+  }
 
-    if (!confirmed) {
-      return
-    }
+  const handleDeleteConfirm = async () => {
+    const assignment = deleteModalData.assignment
+    if (!assignment) return
 
     // Optimistically remove from UI
     const originalAssignments = [...assignments]
-    setAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId))
+    setAssignments(prev => prev.filter(a => a.id !== assignment.id))
 
     // Attempt deletion
-    const success = await deleteAssignment(assignmentId)
+    const success = await deleteAssignment(assignment.id)
 
-    if (!success) {
+    if (success) {
+      setDeleteModalData({ isOpen: false, assignment: null })
+    } else {
       // Restore the assignment if deletion failed
       setAssignments(originalAssignments)
+      setDeleteModalData({ isOpen: false, assignment: null })
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    if (!isDeleting) {
+      setDeleteModalData({ isOpen: false, assignment: null })
     }
   }
 
@@ -398,6 +456,36 @@ export default function DashboardPage() {
       return (
         <div className="flex justify-center items-center h-64">
           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          
+          {/* Debug Box 1: Dashboard Flow */}
+          {isDebugMode() && (
+            <div className="fixed bottom-4 left-4 bg-green-900/90 text-white p-3 rounded-lg max-w-md z-50">
+              <h4 className="font-bold text-xs mb-2">🏠 Dashboard Debug:</h4>
+              <div className="text-xs space-y-1 max-h-48 overflow-y-auto">
+                {debugData.map((info, index) => (
+                  <div key={index} className="font-mono text-xs leading-tight">{info}</div>
+                ))}
+              </div>
+              <div className="text-xs mt-2 opacity-70 border-t border-green-700 pt-1">
+                Loading: {loading.toString()} | Profile: {profile ? 'Loaded' : 'None'} | Error: {error || 'None'}
+              </div>
+            </div>
+          )}
+
+          {/* Debug Box 2: Dashboard Timing */}
+          {isDebugMode() && (
+            <div className="fixed bottom-4 right-4 bg-orange-900/90 text-white p-3 rounded-lg max-w-md z-50">
+              <h4 className="font-bold text-xs mb-2">⏱️ Dashboard Timing:</h4>
+              <div className="text-xs space-y-1 max-h-48 overflow-y-auto">
+                {dashboardTiming.map((info, index) => (
+                  <div key={index} className="font-mono text-xs leading-tight">{info}</div>
+                ))}
+              </div>
+              <div className="text-xs mt-2 opacity-70 border-t border-orange-700 pt-1">
+                Steps: {dashboardTiming.length} | Classes: {classes.length} | Assignments: {assignments.length}
+              </div>
+            </div>
+          )}
         </div>
       )
     }
@@ -409,7 +497,7 @@ export default function DashboardPage() {
             profile={profile}
             classes={classes}
             assignments={assignments}
-            handleDeleteAssignment={handleDeleteAssignment}
+            handleDeleteAssignment={handleDeleteClick}
             isDeleting={isDeleting}
           />
         )
@@ -454,10 +542,10 @@ export default function DashboardPage() {
 
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-3xl font-bold text-gray-900">
             Welcome back, {profile?.first_name || "User"}!
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <p className="text-gray-600 mt-2">
             {profile?.role === "teacher"
               ? "Here's an overview of your classes and assignments."
               : profile?.role === "student"
@@ -466,8 +554,30 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Class Deletion Notifications for Students */}
+        {profile?.role === "student" && (
+          <ClassDeletionBanner />
+        )}
+
         {renderDashboardContent()}
       </div>
+
+      {deleteModalData.assignment && (
+        <DeleteAssignmentModal
+          isOpen={deleteModalData.isOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          assignmentTitle={
+            deleteModalData.assignment.title ||
+            (deleteModalData.assignment.surah_name && deleteModalData.assignment.start_ayah && deleteModalData.assignment.end_ayah
+              ? generateAssignmentTitle(deleteModalData.assignment.surah_name, deleteModalData.assignment.start_ayah, deleteModalData.assignment.end_ayah)
+              : deleteModalData.assignment.surah)
+          }
+          submissionCount={0} // Dashboard doesn't show submission count
+          studentCount={0} // Dashboard doesn't show student count
+          isDeleting={isDeleting}
+        />
+      )}
     </AuthenticatedLayout>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Clock, ChevronDown } from "lucide-react"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface TimePickerProps {
   value: string // Expects "HH:mm" (24-hour format)
@@ -67,12 +68,7 @@ export function TimePicker({
         hours24 = 0
       }
       const timeString = `${String(hours24).padStart(2, "0")}:${String(m).padStart(2, "0")}`
-      console.log('=== TIMEPICKER DEBUG ===')
-      console.log('TimePicker onChange called with hour:', h, 'minute:', m, 'period:', p)
-      console.log('Converted to 24-hour:', hours24)
-      console.log('Final timeString:', timeString)
-      console.log('=== END TIMEPICKER DEBUG ===')
-      onChange(timeString)
+          onChange(timeString)
     } else {
         onChange("")
     }
@@ -94,7 +90,7 @@ export function TimePicker({
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`w-full px-3 py-2 text-left border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-50 disabled:cursor-not-allowed flex items-center justify-between ${className}`}
+        className={`w-full px-3 py-2 text-left border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus} disabled:bg-gray-50 disabled:cursor-not-allowed flex items-center justify-between ${className}`}
       >
         <div className="flex items-center">
           <Clock className="h-4 w-4 text-gray-400 mr-2" />
@@ -111,7 +107,7 @@ export function TimePicker({
               <div className="max-h-48 overflow-y-auto">
                 {hours.map((h) => (
                   <button key={h} type="button" onClick={() => handleTimeChange(h, selectedMinute ?? 0, selectedPeriod ?? 'PM')}
-                    className={`w-full px-2 py-1 text-sm rounded text-center ${selectedHour === h ? "bg-purple-100 text-purple-700 font-medium" : "text-gray-700 hover:bg-gray-100"}`}
+                    className={`w-full px-2 py-1 text-sm rounded text-center ${selectedHour === h ? `${dynamicAccent.badge.primary} font-medium` : "text-gray-700 hover:bg-gray-100"}`}
                   >{h}</button>
                 ))}
               </div>
@@ -120,7 +116,7 @@ export function TimePicker({
               <div className="max-h-48 overflow-y-auto">
                 {minutes.map((m) => (
                   <button key={m} type="button" onClick={() => handleTimeChange(selectedHour ?? 12, m, selectedPeriod ?? 'PM')}
-                    className={`w-full px-2 py-1 text-sm rounded text-center ${selectedMinute === m ? "bg-purple-100 text-purple-700 font-medium" : "text-gray-700 hover:bg-gray-100"}`}
+                    className={`w-full px-2 py-1 text-sm rounded text-center ${selectedMinute === m ? `${dynamicAccent.badge.primary} font-medium` : "text-gray-700 hover:bg-gray-100"}`}
                   >{String(m).padStart(2, "0")}</button>
                 ))}
               </div>
@@ -129,7 +125,7 @@ export function TimePicker({
               <div className="space-y-1">
                 {(["AM", "PM"] as const).map((p) => (
                   <button key={p} type="button" onClick={() => handleTimeChange(selectedHour ?? 12, selectedMinute ?? 0, p)}
-                    className={`w-full px-2 py-1 text-sm rounded text-center ${selectedPeriod === p ? "bg-purple-100 text-purple-700 font-medium" : "text-gray-700 hover:bg-gray-100"}`}
+                    className={`w-full px-2 py-1 text-sm rounded text-center ${selectedPeriod === p ? `${dynamicAccent.badge.primary} font-medium` : "text-gray-700 hover:bg-gray-100"}`}
                   >{p}</button>
                 ))}
               </div>

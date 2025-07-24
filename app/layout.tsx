@@ -2,8 +2,9 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import { SettingsProvider } from "@/contexts/settings-context"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as Sonner } from "sonner"
+import { ThemeScript } from "./theme-script"
 
 export const metadata: Metadata = {
   title: "Taleem - Islamic Learning Platform",
@@ -18,16 +19,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <SettingsProvider>{children}</SettingsProvider>
-          <Toaster />
-        </ThemeProvider>
+        <SettingsProvider>{children}</SettingsProvider>
+        <Toaster />
+        <Sonner />
       </body>
     </html>
   )

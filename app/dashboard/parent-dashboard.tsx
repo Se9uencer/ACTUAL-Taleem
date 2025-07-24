@@ -8,7 +8,7 @@ export function ParentDashboard() {
   return (
     <div className="space-y-6">
       <div className="bg-primary/5 p-6 rounded-lg border border-primary/10">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Parent Dashboard</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Parent Dashboard</h2>
         <p className="text-primary-foreground mb-4">
           Welcome to Taleem! As a parent, you can monitor your children's progress, view their assignments, and track
           their Quran recitation journey.
@@ -23,7 +23,7 @@ export function ParentDashboard() {
       </div>
 
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1 mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1 mb-4">
           Quick Links
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -5,7 +5,8 @@ import { createClientComponentClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCircle, CheckCircle, Headphones } from "lucide-react"
 import { RecitationTranscription } from "./recitation-transcription"
-import { RecitationAudioPlayer } from "@/components/recitation-audio-player";
+import { RecitationAudioPlayer } from "@/components/recitation-audio-player"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface RecitationFeedbackProps {
   recitationId: string
@@ -62,7 +63,7 @@ export function RecitationFeedback({ recitationId }: RecitationFeedbackProps) {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
-        <div className="animate-spin h-8 w-8 border-4 border-purple-600 border-t-transparent rounded-full"></div>
+        <div className={`animate-spin h-8 w-8 ${dynamicAccent.spinner.ring} rounded-full`}></div>
       </div>
     )
   }
@@ -96,7 +97,7 @@ export function RecitationFeedback({ recitationId }: RecitationFeedbackProps) {
 
           <div className="bg-muted p-4 rounded-md mb-4">
             <div className="flex items-center mb-2">
-              <Headphones className="h-5 w-5 text-purple-600 mr-2" />
+              <Headphones className={`h-5 w-5 ${dynamicAccent.icon.primary} mr-2`} />
               <h4 className="font-medium">Your Recording</h4>
             </div>
             {recitation.audio_url && (

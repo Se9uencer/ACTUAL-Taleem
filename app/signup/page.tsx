@@ -32,17 +32,10 @@ export default function SignupPage() {
   // Generate a unique student ID
   const generateStudentId = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Removed similar looking characters
-    let code = "TLM-"
+    let code = "TLM"
 
-    // First segment (3 chars)
-    for (let i = 0; i < 3; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
-    }  
-
-    code += "-"
-
-    // Second segment (3 chars)
-    for (let i = 0; i < 3; i++) {
+    // Generate 6 additional characters (no dashes)
+    for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length))
     }
 

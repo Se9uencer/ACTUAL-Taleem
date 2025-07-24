@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface RecitationTranscriptionProps {
   recitationId: string
@@ -54,7 +55,7 @@ export function RecitationTranscription({ recitationId }: RecitationTranscriptio
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-center py-4">
-            <div className="animate-spin h-5 w-5 border-2 border-purple-600 border-t-transparent rounded-full mr-2"></div>
+            <div className={`animate-spin h-5 w-5 ${dynamicAccent.spinner.border} rounded-full mr-2`}></div>
             <span className="text-sm text-muted-foreground">Loading transcription...</span>
           </div>
         </CardContent>
@@ -105,8 +106,8 @@ export function RecitationTranscription({ recitationId }: RecitationTranscriptio
   return (
     <Card>
       <CardContent className="p-4">
-        <h4 className="text-sm font-medium mb-2 text-purple-700 dark:text-purple-400">Transcription</h4>
-        <div className="p-3 border border-purple-200 dark:border-purple-800 rounded-md bg-purple-50 dark:bg-purple-900/10">
+        <h4 className={`text-sm font-medium mb-2 ${dynamicAccent.icon.primary}`}>Transcription</h4>
+        <div className={`p-3 border border-[var(--accent-medium)] rounded-md ${dynamicAccent.badge.primary}`}>
           <p className="text-right font-arabic text-lg" dir="rtl">
             {transcript}
           </p>

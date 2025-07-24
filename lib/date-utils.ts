@@ -20,20 +20,11 @@ export function formatDatePST(dateString: string, options: Intl.DateTimeFormatOp
  * Formats a date string to display in Pacific Time (Los Angeles) with time
  */
 export function formatDateTimePST(dateString: string): string {
-  console.log('=== formatDateTimePST DEBUG ===')
-  console.log('Input dateString:', dateString)
-  const date = new Date(dateString)
-  console.log('Parsed as Date object:', date)
-  console.log('Date.toISOString():', date.toISOString())
-  
-  const result = formatDatePST(dateString, {
+  return formatDatePST(dateString, {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   })
-  console.log('formatDateTimePST result:', result)
-  console.log('=== END formatDateTimePST DEBUG ===')
-  return result
 }
 
 /**

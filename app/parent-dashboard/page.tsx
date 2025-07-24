@@ -9,6 +9,7 @@ import { ClaimChildForm } from "./claim-child-form"
 import { ChildrenList } from "./children-list"
 import { ChildProgressView } from "./child-progress-view"
 import { ChildrenPerformanceOverview } from "./children-performance-overview"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 export default function ParentDashboardPage() {
   const [profile, setProfile] = useState<any>(null)
@@ -171,10 +172,10 @@ export default function ParentDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <TaleemLogo className="h-12 w-auto text-purple-600 mb-4" />
+        <TaleemLogo className={`h-12 w-auto ${dynamicAccent.icon.primary} mb-4`} />
         <p className="text-gray-700 mb-2">Loading parent dashboard...</p>
         <div className="w-16 h-1 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-purple-600 animate-pulse"></div>
+          <div className={`h-full ${dynamicAccent.button.primary} animate-pulse`}></div>
         </div>
       </div>
     )
@@ -195,7 +196,7 @@ export default function ParentDashboardPage() {
             </button>
             <button
               onClick={() => router.push("/login")}
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+              className={`px-4 py-2 ${dynamicAccent.button.primary} rounded transition-colors`}
             >
               Return to Login
             </button>
@@ -210,7 +211,7 @@ export default function ParentDashboardPage() {
               <header className="bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <TaleemLogo className="h-8 w-auto text-purple-600 mr-2" />
+            <TaleemLogo className={`h-8 w-auto ${dynamicAccent.icon.primary} mr-2`} />
             <h1 className="text-2xl font-bold text-gray-900">Parent Dashboard</h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -218,13 +219,13 @@ export default function ParentDashboardPage() {
               {profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : profile.email} (
               {profile.role})
             </span>
-            <Link href="/dashboard" className="text-sm text-purple-600 hover:text-purple-800">
+            <Link href="/dashboard" className={`text-sm ${dynamicAccent.link.primary}`}>
               Dashboard
             </Link>
-            <Link href="/profile" className="text-sm text-purple-600 hover:text-purple-800">
+            <Link href="/profile" className={`text-sm ${dynamicAccent.link.primary}`}>
               My Profile
             </Link>
-            <button onClick={handleSignOut} className="text-sm text-purple-600 hover:text-purple-800">
+            <button onClick={handleSignOut} className={`text-sm ${dynamicAccent.link.primary}`}>
               Sign out
             </button>
           </div>

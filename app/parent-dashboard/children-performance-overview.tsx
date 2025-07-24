@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, Award, Clock, BookOpen, Calendar, Target, AlertTriangle } from "lucide-react"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface ChildPerformance {
   id: string
@@ -197,7 +198,7 @@ export function ChildrenPerformanceOverview({ children }: ChildrenPerformanceOve
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+        <div className={`w-8 h-8 ${dynamicAccent.spinner.ring} rounded-full animate-spin`}></div>
       </div>
     )
   }
@@ -233,17 +234,17 @@ export function ChildrenPerformanceOverview({ children }: ChildrenPerformanceOve
   return (
     <div className="space-y-6">
       {/* Overall Summary */}
-      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+      <Card className={`bg-gradient-to-r from-[var(--accent-light)] to-blue-50 border-[var(--accent-medium)]`}>
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2">
-            <Award className="h-6 w-6 text-purple-600" />
+            <Award className={`h-6 w-6 ${dynamicAccent.icon.primary}`} />
             Family Overview
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold mb-1 text-purple-600">
+              <div className={`text-2xl font-bold mb-1 ${dynamicAccent.icon.primary}`}>
                 {Math.round(averageCompletionRate * 100)}%
               </div>
               <div className="text-sm text-gray-600">Average Completion</div>
@@ -310,7 +311,7 @@ export function ChildrenPerformanceOverview({ children }: ChildrenPerformanceOve
                 {/* Key Stats */}
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-purple-600" />
+                    <Clock className={`h-4 w-4 ${dynamicAccent.icon.primary}`} />
                     <div>
                       <div className="text-xs text-gray-600">On Time</div>
                       <div className="text-sm font-semibold">{child.onTimeSubmissions}</div>

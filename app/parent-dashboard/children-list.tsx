@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { School, User } from "lucide-react"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface ChildrenListProps {
   children: any[]
@@ -25,12 +26,12 @@ export function ChildrenList({ children, onViewProgress, selectedChildId }: Chil
       {children.map((child) => (
         <Card
           key={child.id}
-          className={`overflow-hidden ${selectedChildId === child.id ? "ring-2 ring-purple-500" : ""}`}
+          className={`overflow-hidden ${selectedChildId === child.id ? "ring-2 ring-[var(--primary)]" : ""}`}
         >
           <CardContent className="p-0">
-            <div className="bg-purple-50 p-4">
+            <div className={`${dynamicAccent.badge.primary} p-4`}>
               <h3 className="font-medium text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-purple-600" />
+                <User className={`h-5 w-5 ${dynamicAccent.icon.primary}`} />
                 {child.first_name} {child.last_name}
               </h3>
               <p className="text-sm text-gray-500">Student ID: {child.student_id}</p>
@@ -39,7 +40,7 @@ export function ChildrenList({ children, onViewProgress, selectedChildId }: Chil
             <div className="p-4 space-y-3">
               <div>
                 <h4 className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-1">
-                  <School className="h-4 w-4 text-purple-600" />
+                  <School className={`h-4 w-4 ${dynamicAccent.icon.primary}`} />
                   Classes Enrolled
                 </h4>
                 {child.classes && child.classes.length > 0 ? (

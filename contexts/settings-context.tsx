@@ -2,76 +2,100 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { useTheme } from "next-themes"
 import { createClientComponentClient } from "@/lib/supabase/client"
-
-type Theme = "light" | "dark" | "system"
-type ColorAccent = "purple" | "blue" | "teal" | "green"
+import { 
+  type AccentColor, 
+  getUserThemeAccentColorDirect, 
+  AVAILABLE_ACCENT_COLORS,
+  isValidAccentColor 
+} from "@/lib/theme-utils"
 
 interface SettingsContextType {
-  theme: Theme
-  setTheme: (theme: Theme) => void
-  colorAccent: ColorAccent
-  setColorAccent: (color: ColorAccent) => void
-  saveSettingsToSupabase: () => Promise<void>
+  colorAccent: AccentColor
+  setColorAccent: (color: AccentColor) => void
   isLoading: boolean
-  resolvedTheme: "light" | "dark" // The actual theme after resolving system preference
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const { theme: nextTheme, setTheme: setNextTheme, resolvedTheme: nextResolvedTheme } = useTheme()
-  const [colorAccent, setColorAccentState] = useState<ColorAccent>("purple")
+  const [colorAccent, setColorAccentState] = useState<AccentColor>("purple")
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load settings from localStorage and Supabase on mount
+  // Load accent color based on authentication status
   useEffect(() => {
     setMounted(true)
 
-    // Load color accent from localStorage immediately
-    const storedColor = localStorage.getItem("taleem-color") as ColorAccent | null
-    if (storedColor) {
-      setColorAccentState(storedColor)
-    }
+    const supabase = createClientComponentClient()
 
-    // Load settings from user's profile in Supabase if they're logged in
-    const loadSettingsFromSupabase = async () => {
+    // Always start with purple, then load user's saved color if authenticated
+    const loadAccentColor = async () => {
       try {
-        const supabase = createClientComponentClient()
         const { data: session } = await supabase.auth.getSession()
 
         if (session?.session?.user) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("theme, color_accent")
-            .eq("id", session.session.user.id)
-            .single()
-
-          if (data) {
-            // Update theme via next-themes
-            if (data.theme && typeof data.theme === 'string') {
-              setNextTheme(data.theme)
-              localStorage.setItem("taleem-theme", data.theme)
-            }
-
-            // Update color accent
-            if (data.color_accent && typeof data.color_accent === 'string') {
-              setColorAccentState(data.color_accent as ColorAccent)
-              localStorage.setItem("taleem-color", data.color_accent)
-            }
+          // User is logged in - load their saved accent color from Supabase
+          const userAccentColor = await getUserThemeAccentColorDirect(supabase)
+          
+          if (userAccentColor && isValidAccentColor(userAccentColor)) {
+            setColorAccentState(userAccentColor)
+            localStorage.setItem("taleem-color", userAccentColor)
+          } else {
+            // User is logged in but has no saved color - use purple default
+            setColorAccentState("purple")
+            localStorage.setItem("taleem-color", "purple")
           }
+        } else {
+          // User is not logged in - always use purple
+          setColorAccentState("purple")
+          localStorage.setItem("taleem-color", "purple")
         }
       } catch (error) {
-        console.error("Error loading settings from Supabase:", error)
+        console.error("Error loading accent color:", error)
+        // On error, fallback to purple
+        setColorAccentState("purple")
+        localStorage.setItem("taleem-color", "purple")
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadSettingsFromSupabase()
-  }, [setNextTheme])
+    // Load initial accent color
+    loadAccentColor()
+
+    // Listen for auth state changes (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        // User logged out or session ended - reset to purple immediately
+        setColorAccentState("purple")
+        localStorage.setItem("taleem-color", "purple")
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        // User logged in - load their saved accent color
+        try {
+          const userAccentColor = await getUserThemeAccentColorDirect(supabase)
+          
+          if (userAccentColor && isValidAccentColor(userAccentColor)) {
+            setColorAccentState(userAccentColor)
+            localStorage.setItem("taleem-color", userAccentColor)
+          } else {
+            // User logged in but has no saved color - use purple default
+            setColorAccentState("purple")
+            localStorage.setItem("taleem-color", "purple")
+          }
+        } catch (error) {
+          console.error("Error loading user accent color after login:", error)
+          setColorAccentState("purple")
+          localStorage.setItem("taleem-color", "purple")
+        }
+      }
+    })
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   // Update color accent styles and data attributes
   useEffect(() => {
@@ -91,59 +115,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [colorAccent, mounted])
 
-  // Update data-theme attribute when resolved theme changes
-  useEffect(() => {
-    if (!mounted || !nextResolvedTheme) return
-
-    const root = window.document.documentElement
-    root.setAttribute("data-theme", nextResolvedTheme)
-  }, [nextResolvedTheme, mounted])
-
-  // Set theme function that uses next-themes
-  const setTheme = (newTheme: Theme) => {
-    setNextTheme(newTheme)
-    localStorage.setItem("taleem-theme", newTheme)
-  }
-
   // Set color accent function
-  const setColorAccent = (newColor: ColorAccent) => {
+  const setColorAccent = (newColor: AccentColor) => {
     setColorAccentState(newColor)
-  }
-
-  // Save theme and color accent preferences to the user's profile in Supabase
-  const saveSettingsToSupabase = async () => {
-    try {
-      const supabase = createClientComponentClient()
-      const { data: session } = await supabase.auth.getSession()
-
-      if (session?.session?.user) {
-        await supabase
-          .from("profiles")
-          .update({
-            theme: nextTheme,
-            color_accent: colorAccent,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", session.session.user.id)
-      }
-
-      return Promise.resolve()
-    } catch (error) {
-      console.error("Error saving settings to Supabase:", error)
-      return Promise.reject(error)
-    }
   }
 
   return (
     <SettingsContext.Provider
       value={{
-        theme: (nextTheme as Theme) || "system",
-        setTheme,
         colorAccent,
         setColorAccent,
-        saveSettingsToSupabase,
         isLoading,
-        resolvedTheme: (nextResolvedTheme as "light" | "dark") || "light",
       }}
     >
       {children}
@@ -158,3 +140,4 @@ export function useSettings() {
   }
   return context
 }
+

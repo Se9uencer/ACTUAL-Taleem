@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { XIcon } from "lucide-react"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface NewClassModalProps {
   isOpen: boolean
@@ -97,7 +98,7 @@ export default function NewClassModal({ isOpen, onClose, onSubmit }: NewClassMod
                 id="class-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus}`}
                 placeholder="e.g., Quran Memorization"
                 required
               />

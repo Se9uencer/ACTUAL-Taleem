@@ -115,7 +115,7 @@ export function ClaimChildForm({ parentId, onSuccess }: ClaimChildFormProps) {
         <div className="flex gap-2">
           <FormattedCodeInput
             id="student-id"
-            placeholder="TLM921A7"
+            placeholder="TLMABC123"
             value={studentId}
             onChange={setStudentId}
             format="student-id-nodash"

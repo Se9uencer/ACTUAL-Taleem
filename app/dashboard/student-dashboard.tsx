@@ -30,7 +30,7 @@ export function StudentDashboard({
       <div className="lg:col-span-2 space-y-6">
         <section>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1">
+            <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1">
               Enrolled Classes
             </h2>
             <Link href="/join-class" className="text-sm font-medium text-primary hover:text-primary/80">
@@ -68,7 +68,7 @@ export function StudentDashboard({
 
         {/* Quick Links */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1 mb-4">
             Quick Links
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -110,7 +110,7 @@ export function StudentDashboard({
       <div className="space-y-6">
         <section>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1">
+            <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1">
               Your Assignments
             </h2>
             <Link href="/assignments" className="text-sm font-medium text-primary hover:text-primary/80">
@@ -180,7 +180,7 @@ export function StudentDashboard({
 
         {/* Your Progress */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b-2 border-primary/20 pb-1 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1 mb-4">
             Your Progress
           </h2>
           <div className="grid grid-cols-2 gap-4">

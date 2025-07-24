@@ -278,7 +278,7 @@ export default function SubmissionsList({
                             </h6>
                             <div className="space-y-4">
                               {student.latest_submission.verse_feedback.map((verse, index) => (
-                                <div key={index} className="border-l-4 border-purple-200 dark:border-purple-700 pl-4">
+                                <div key={index} className="border-l-4 border-purple-200 pl-4">
                                                                      <div className="flex items-center justify-between mb-2">
                                      <span className="text-sm font-medium text-foreground">
                                        Ayah {verse.ayah}
@@ -305,18 +305,18 @@ export default function SubmissionsList({
                                     </div>
 
                                     {verse.differences && verse.differences.length > 0 && (
-                                      <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded">
-                                        <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-1">
+                                      <div className="bg-orange-50 p-2 rounded">
+                                        <p className="text-xs text-orange-600 font-medium mb-1">
                                           Differences Found ({verse.differences.length}):
                                         </p>
                                         <div className="space-y-1">
                                           {verse.differences.slice(0, 3).map((diff, diffIndex) => (
-                                            <p key={diffIndex} className="text-xs text-orange-700 dark:text-orange-300">
+                                            <p key={diffIndex} className="text-xs text-orange-700">
                                               Word {diff.position}: Expected &quot;{diff.expected}&quot; → Heard &quot;{diff.transcribed}&quot;
                                             </p>
                                           ))}
                                           {verse.differences.length > 3 && (
-                                            <p className="text-xs text-orange-600 dark:text-orange-400 italic">
+                                            <p className="text-xs text-orange-600 italic">
                                               +{verse.differences.length - 3} more differences
                                             </p>
                                           )}

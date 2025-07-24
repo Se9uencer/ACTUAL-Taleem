@@ -15,8 +15,13 @@ import {
   BookOpenIcon,
   CreditCardIcon as IdCardIcon,
   AlertTriangle,
+  Trash2,
 } from "lucide-react"
 import AssignmentsList from "./assignments-list"
+import { DeleteClassModal } from "@/components/ui/delete-class-modal"
+import { useClassDeletion } from "@/hooks/use-class-deletion"
+import { toast } from "sonner"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 interface StudentProfile {
   id: string
@@ -45,7 +50,8 @@ export default function ClassDetailsPage() {
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-    const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<any>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   const [supabase, setSupabase] = useState<any>(null)
   const [copied, setCopied] = useState(false)
@@ -61,6 +67,7 @@ export default function ClassDetailsPage() {
   const router = useRouter()
   const params = useParams()
   const classId = params.id as string
+  const { deleteClass, isDeleting, error: deleteError } = useClassDeletion()
 
   useEffect(() => {
     const client = createClientComponentClient()
@@ -180,6 +187,30 @@ export default function ClassDetailsPage() {
     }
   }
 
+  const handleDeleteClass = () => {
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!classData) return
+
+    const success = await deleteClass(classData.id, classData.name)
+    
+    if (success) {
+      setIsDeleteModalOpen(false)
+      toast.success(`Class "${classData.name}" deleted successfully`)
+      router.push('/classes')
+    } else if (deleteError) {
+      toast.error(deleteError)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    if (!isDeleting) {
+      setIsDeleteModalOpen(false)
+    }
+  }
+
   const loadStudentAssignments = async (studentId: string) => {
     if (!supabase || !classId) return
 
@@ -293,7 +324,7 @@ export default function ClassDetailsPage() {
           <p className="mb-4">{error}</p>
           <Link
             href="/dashboard"
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors inline-block"
+            className={`px-4 py-2 ${dynamicAccent.button.primary} rounded transition-colors inline-block`}
           >
             Return to Dashboard
           </Link>
@@ -310,7 +341,7 @@ export default function ClassDetailsPage() {
           <p className="mb-4">The class you're looking for doesn't exist or you don't have access to it.</p>
           <Link
             href="/dashboard"
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors inline-block"
+            className={`px-4 py-2 ${dynamicAccent.button.primary} rounded transition-colors inline-block`}
           >
             Return to Dashboard
           </Link>
@@ -339,10 +370,10 @@ export default function ClassDetailsPage() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <TaleemLogo className="h-8 w-auto text-purple-600 mr-2" />
+            <TaleemLogo className={`h-8 w-auto ${dynamicAccent.icon.primary} mr-2`} />
             <h1 className="text-2xl font-bold text-gray-900">Class Details</h1>
           </div>
-          <Link href="/dashboard" className="text-purple-600 hover:text-purple-800">
+          <Link href="/dashboard" className={dynamicAccent.link.primary}>
             Back to Dashboard
           </Link>
         </div>
@@ -358,12 +389,22 @@ export default function ClassDetailsPage() {
                 {classData.schools?.name && <p className="text-gray-600">School: {classData.schools.name}</p>}
               </div>
               {isTeacher && (
-                <Link
-                  href={`/assignments/new?class=${classData.id}`}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700"
-                >
-                  Create Assignment
-                </Link>
+                <div className="flex gap-2">
+                  <Link
+                    href={`/assignments/new?class=${classData.id}`}
+                    className={`${dynamicAccent.button.primary} px-4 py-2 rounded-md text-sm font-medium`}
+                  >
+                    Create Assignment
+                  </Link>
+                  <button
+                    onClick={handleDeleteClass}
+                    className="border border-red-300 text-red-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 hover:border-red-400 flex items-center"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete Class
+                  </button>
+                </div>
               )}
             </div>
             {classData.description && <p className="text-gray-700 mt-4">{classData.description}</p>}
@@ -379,7 +420,7 @@ export default function ClassDetailsPage() {
                 </div>
                 <button
                   onClick={copyClassCode}
-                  className="ml-2 p-2 text-gray-500 hover:text-purple-600 focus:outline-none"
+                  className={`ml-2 p-2 text-gray-500 hover:text-[var(--primary)] focus:outline-none`}
                   aria-label="Copy class code"
                 >
                   {copied ? <CheckIcon className="h-5 w-5 text-green-500" /> : <CopyIcon className="h-5 w-5" />}
@@ -416,7 +457,7 @@ export default function ClassDetailsPage() {
                       )}
                       <div className="p-4">
                         <div className="flex items-center mb-3">
-                          <div className="bg-purple-100 text-purple-600 p-2 rounded-full mr-3">
+                          <div className={`${dynamicAccent.badge.primary} p-2 rounded-full mr-3`}>
                             <UserIcon className="h-5 w-5" />
                           </div>
                           <div>
@@ -434,7 +475,7 @@ export default function ClassDetailsPage() {
                             </div>
                             <button
                               onClick={() => copyStudentId(profile.student_id!)}
-                              className="ml-1 p-1 text-gray-500 hover:text-purple-600 focus:outline-none"
+                              className="ml-1 p-1 text-gray-500 hover:text-[var(--primary)] focus:outline-none"
                               title="Copy student ID"
                             >
                               {copiedStudentId === profile.student_id ? (
@@ -449,7 +490,7 @@ export default function ClassDetailsPage() {
                           {profile ? (
                             <button
                               onClick={() => handleViewProfile(profile.id)}
-                              className="flex-1 text-center px-3 py-1.5 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+                              className={`flex-1 text-center px-3 py-1.5 ${dynamicAccent.button.primary} text-sm rounded`}
                             >
                               View Profile
                             </button>
@@ -505,16 +546,16 @@ export default function ClassDetailsPage() {
                               <div className="mb-4 p-3 bg-gray-50 rounded-md">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center">
-                                    <IdCardIcon className="h-5 w-5 text-purple-600 mr-2" />
+                                    <IdCardIcon className={`h-5 w-5 ${dynamicAccent.icon.primary} mr-2`} />
                                     <h4 className="text-sm font-medium text-gray-700">Student ID</h4>
                                   </div>
                                   <div className="flex items-center">
-                                    <code className="bg-white px-3 py-1 rounded border text-purple-700 font-mono text-sm">
+                                    <code className={`bg-white px-3 py-1 rounded border ${dynamicAccent.icon.primary} font-mono text-sm`}>
                                       {profile.student_id}
                                     </code>
                                     <button
                                       onClick={() => copyStudentId(profile.student_id!)}
-                                      className="ml-1 p-1 text-gray-500 hover:text-purple-600 focus:outline-none"
+                                      className="ml-1 p-1 text-gray-500 hover:text-[var(--primary)] focus:outline-none"
                                       title="Copy student ID"
                                     >
                                       {copiedStudentId === profile.student_id ? (
@@ -533,7 +574,7 @@ export default function ClassDetailsPage() {
 
                             <div className="mb-6">
                               <h4 className="text-lg font-medium text-gray-800 mb-2 flex items-center">
-                                <BookOpenIcon className="h-5 w-5 mr-2 text-purple-600" />
+                                <BookOpenIcon className={`h-5 w-5 mr-2 ${dynamicAccent.icon.primary}`} />
                                 Assignments
                               </h4>
 
@@ -611,7 +652,7 @@ export default function ClassDetailsPage() {
                 </div>
                 <Link
                   href={`/assignments/new?class=${classId}`}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700"
+                  className={`${dynamicAccent.button.primary} px-4 py-2 rounded-md text-sm font-medium`}
                 >
                   Create Assignment
                 </Link>
@@ -622,12 +663,23 @@ export default function ClassDetailsPage() {
           )}
         </div>
       </main>
+
+      {classData && (
+        <DeleteClassModal
+          isOpen={isDeleteModalOpen}
+          onClose={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+          className={classData.name}
+          studentCount={studentCount}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   )
 }
 
 // DEV ONLY: Helper to validate class_students consistency
-if (process.env.NODE_ENV === "development") {
+if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
   (window as any).validateClassStudents = async (classId: string) => {
     const client = createClientComponentClient()
     const { data: classStudents } = await client

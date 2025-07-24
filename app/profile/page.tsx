@@ -9,6 +9,7 @@ import AuthenticatedLayout from "@/components/authenticated-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, AlertCircle, Copy } from "lucide-react"
+import { dynamicAccent } from "@/lib/accent-utils"
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null)
@@ -94,20 +95,13 @@ export default function ProfilePage() {
   // Generate a unique student ID and save it to the profile
   const generateAndSaveStudentId = async (supabase: any, userId: string) => {
     try {
-      // Generate a student ID in format TLM-XXX-XXX (where X is alphanumeric)
+      // Generate a student ID in format TLMXXXXXX (where X is alphanumeric, no dashes)
       const generateCode = () => {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Removed similar looking characters
-        let code = "TLM-"
+        let code = "TLM"
 
-        // First segment (3 chars)
-        for (let i = 0; i < 3; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length))
-        }
-
-        code += "-"
-
-        // Second segment (3 chars)
-        for (let i = 0; i < 3; i++) {
+        // Generate 6 additional characters (no dashes)
+        for (let i = 0; i < 6; i++) {
           code += chars.charAt(Math.floor(Math.random() * chars.length))
         }
 
@@ -185,7 +179,7 @@ export default function ProfilePage() {
     return (
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
-          <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+          <div className={`w-12 h-12 ${dynamicAccent.spinner.ring} rounded-full animate-spin`}></div>
         </div>
       </AuthenticatedLayout>
     )
@@ -193,7 +187,8 @@ export default function ProfilePage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Profile Information */}
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="border-b border-gray-100 bg-gray-50">
             <CardTitle className="text-xl font-semibold">Edit Profile</CardTitle>
@@ -215,21 +210,21 @@ export default function ProfilePage() {
 
             {/* Student ID Display */}
             {profile?.role === "student" && profile?.student_id && (
-              <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-100">
-                <h3 className="text-sm font-medium text-purple-800 mb-2">Your Student ID</h3>
+              <div className={`mb-6 p-4 ${dynamicAccent.badge.primary} rounded-lg border border-[var(--accent-medium)]`}>
+                <h3 className={`text-sm font-medium ${dynamicAccent.icon.primary} mb-2`}>Your Student ID</h3>
                 <div className="flex items-center">
-                  <code className="bg-white px-3 py-1.5 rounded border border-purple-200 text-purple-700 font-mono text-sm flex-grow">
+                  <code className={`bg-white px-3 py-1.5 rounded border border-[var(--accent-medium)] ${dynamicAccent.icon.primary} font-mono text-sm flex-grow`}>
                     {profile.student_id}
                   </code>
                   <button
                     onClick={copyStudentId}
-                    className="ml-2 p-2 text-purple-600 hover:text-purple-800 focus:outline-none"
+                    className={`ml-2 p-2 ${dynamicAccent.link.primary} focus:outline-none`}
                     title="Copy to clipboard"
                   >
                     {codeCopied ? <CheckCircle className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5" />}
                   </button>
                 </div>
-                <p className="text-xs text-purple-600 mt-2">Share this ID with your parent to link your account</p>
+                <p className={`text-xs ${dynamicAccent.icon.primary} mt-2`}>Share this ID with your parent to link your account</p>
               </div>
             )}
 
@@ -245,7 +240,7 @@ export default function ProfilePage() {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                    className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus}`}
                   />
                 </div>
 
@@ -259,7 +254,7 @@ export default function ProfilePage() {
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                    className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus}`}
                   />
                 </div>
 
@@ -283,15 +278,15 @@ export default function ProfilePage() {
                     <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">
                       Grade
                     </label>
-                    <input
-                      type="text"
-                      id="grade"
-                      name="grade"
-                      value={formData.grade}
-                      onChange={handleChange}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                      placeholder="e.g., 8th Grade"
-                    />
+                                          <input
+                        type="text"
+                        id="grade"
+                        name="grade"
+                        value={formData.grade}
+                        onChange={handleChange}
+                        className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus}`}
+                        placeholder="e.g., 8th Grade"
+                      />
                   </div>
                 )}
 
@@ -301,30 +296,30 @@ export default function ProfilePage() {
                       <label htmlFor="parent_email" className="block text-sm font-medium text-gray-700 mb-1">
                         Parent Email
                       </label>
-                      <input
-                        type="email"
-                        id="parent_email"
-                        name="parent_email"
-                        value={formData.parent_email}
-                        onChange={handleChange}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                        placeholder="parent@example.com"
-                      />
+                                              <input
+                          type="email"
+                          id="parent_email"
+                          name="parent_email"
+                          value={formData.parent_email}
+                          onChange={handleChange}
+                          className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus}`}
+                          placeholder="parent@example.com"
+                        />
                     </div>
 
                     <div>
                       <label htmlFor="parent_phone" className="block text-sm font-medium text-gray-700 mb-1">
                         Parent Phone
                       </label>
-                      <input
-                        type="tel"
-                        id="parent_phone"
-                        name="parent_phone"
-                        value={formData.parent_phone}
-                        onChange={handleChange}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                        placeholder="(123) 456-7890"
-                      />
+                                              <input
+                          type="tel"
+                          id="parent_phone"
+                          name="parent_phone"
+                          value={formData.parent_phone}
+                          onChange={handleChange}
+                          className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none ${dynamicAccent.input.focus}`}
+                          placeholder="(123) 456-7890"
+                        />
                     </div>
                   </>
                 )}

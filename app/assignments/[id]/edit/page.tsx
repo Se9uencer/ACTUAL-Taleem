@@ -8,6 +8,22 @@ import { TaleemLogo } from "@/components/taleem-logo"
 import { surahData, getAyahCount, generateAssignmentTitle } from "@/lib/quran-data"
 import { ArrowLeft, Save } from "lucide-react"
 import { TimePicker } from "@/components/ui/time-picker"
+import { StudentSelector } from "@/components/ui/student-selector"
+
+// Helper function to get all students in a class
+const getAllClassStudents = async (supabase: any, classId: string): Promise<string[]> => {
+  const { data: classStudents, error } = await supabase
+    .from('class_students')
+    .select('student_id')
+    .eq('class_id', classId)
+
+  if (error) {
+    console.error('Error fetching class students:', error)
+    return []
+  }
+
+  return classStudents?.map((cs: any) => cs.student_id) || []
+}
 
 export default function EditAssignmentPage() {
   const [surahName, setSurahName] = useState("")
@@ -16,6 +32,9 @@ export default function EditAssignmentPage() {
   const [maxAyah, setMaxAyah] = useState(7)
   const [dueDate, setDueDate] = useState("")
   const [dueTime, setDueTime] = useState("")
+  const [classId, setClassId] = useState("")
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
+  const [assignToAll, setAssignToAll] = useState(true)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +64,7 @@ export default function EditAssignmentPage() {
         setSurahName(data.surah_name as string)
         setStartAyah(data.start_ayah as number)
         setEndAyah(data.end_ayah as number)
+        setClassId(data.class_id as string)
         
         // Parse the due_date properly to extract date and time in local timezone
         if (data.due_date) {
@@ -62,6 +82,26 @@ export default function EditAssignmentPage() {
           setDueTime(`${hours}:${minutes}`)
         }
 
+        // Load existing student assignments (always from assignment_students table)
+        const { data: assignmentStudents, error: studentsError } = await supabase
+          .from('assignment_students')
+          .select('student_id')
+          .eq('assignment_id', assignmentId)
+
+        if (studentsError) {
+          console.error('Error loading assignment students:', studentsError)
+        } else {
+          const studentIds = assignmentStudents?.map((as: any) => as.student_id as string) || []
+          setSelectedStudentIds(studentIds)
+          
+          // Get all students in the class to check if all are assigned
+          const allClassStudents = await getAllClassStudents(supabase, data.class_id as string)
+          const allAssigned = allClassStudents.length > 0 && 
+                             allClassStudents.length === studentIds.length &&
+                             allClassStudents.every(id => studentIds.includes(id))
+          setAssignToAll(allAssigned)
+        }
+
       } catch (err: any) {
           setError(err.message)
       } finally {
@@ -77,11 +117,20 @@ export default function EditAssignmentPage() {
     if (surahName) setMaxAyah(getAyahCount(surahName))
   }, [surahName])
 
+  const handleStudentSelectionChange = (studentIds: string[], assignToAll: boolean) => {
+    setSelectedStudentIds(studentIds)
+    setAssignToAll(assignToAll)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!dueTime) {
         setError("Please select a due time.")
         return
+    }
+    if (!assignToAll && selectedStudentIds.length === 0) {
+      setError("Please select at least one student or choose 'All Students'.");
+      return
     }
     setSubmitting(true)
     setError(null)
@@ -107,6 +156,43 @@ export default function EditAssignmentPage() {
         .eq("id", assignmentId)
 
       if (error) throw error
+
+      // Update student assignments (always static assignment list)
+      // First, delete existing assignment-student relationships
+      const { error: deleteError } = await supabase
+        .from("assignment_students")
+        .delete()
+        .eq("assignment_id", assignmentId)
+
+      if (deleteError) {
+        console.error("Error deleting existing student assignments:", deleteError)
+        throw new Error("Failed to update student assignments")
+      }
+
+      // Then create new relationships based on current selection
+      const studentsToAssign = assignToAll ? 
+        // If "All Students" selected, snapshot current students in the class
+        await getAllClassStudents(supabase, classId) : 
+        // Otherwise use specifically selected students
+        selectedStudentIds
+
+      if (studentsToAssign.length > 0) {
+        const assignmentStudentData = studentsToAssign.map((studentId: string) => ({
+          assignment_id: assignmentId,
+          student_id: studentId,
+        }))
+
+        const { error: assignmentStudentsError } = await supabase
+          .from("assignment_students")
+          .insert(assignmentStudentData)
+
+        if (assignmentStudentsError) {
+          console.error("Error creating student assignments:", assignmentStudentsError)
+          throw new Error("Failed to assign students to assignment")
+        }
+      } else {
+        throw new Error("No students available to assign")
+      }
 
       router.push(`/assignments/${assignmentId}?message=Assignment updated successfully!`)
     } catch (err: any) {
@@ -178,6 +264,17 @@ export default function EditAssignmentPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Student Selection */}
+              {classId && (
+                <StudentSelector
+                  classId={classId}
+                  selectedStudentIds={selectedStudentIds}
+                  onSelectionChange={handleStudentSelectionChange}
+                  assignToAll={assignToAll}
+                  disabled={submitting}
+                />
+              )}
             </div>
 
             <div className="mt-6 flex justify-end">

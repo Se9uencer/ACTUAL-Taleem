@@ -1,173 +1,216 @@
 "use client"
 
-import type React from "react"
+import { createClientComponentClient, directGetUser, directGetSession } from '@/lib/supabase/client'
+import { User } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { isDebugMode } from '@/lib/debug-utils'
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@/lib/supabase/client"
-import { AcademicHeader } from "@/components/academic-header"
-import { useSettings } from "@/contexts/settings-context"
+interface AuthenticatedLayoutProps {
+  children: React.ReactNode
+}
 
-export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null)
+export default function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const { isLoading: settingsLoading, resolvedTheme } = useSettings()
+
+  // Debug state
+  const [debugData, setDebugData] = useState<string[]>([])
+  const [authTiming, setAuthTiming] = useState<string[]>([])
+
+  const addDebug = (message: string) => {
+    const timestamp = new Date().toISOString()
+    const debugMsg = `${timestamp}: ${message}`
+    setDebugData(prev => [...prev, debugMsg])
+    console.log(`[AuthLayout] ${debugMsg}`)
+  }
+
+  const addTiming = (message: string) => {
+    const timestamp = new Date().toISOString()
+    const timingMsg = `${timestamp}: ${message}`
+    setAuthTiming(prev => [...prev, timingMsg])
+    console.log(`[AuthTiming] ${timingMsg}`)
+  }
 
   useEffect(() => {
+    addDebug('🚀 AuthenticatedLayout mounted')
+    addTiming('⏱️ Starting authentication check')
+    
     const checkAuth = async () => {
-      const supabase = createClientComponentClient()
-
       try {
-        // Check if user is authenticated
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-
-        if (sessionError || !sessionData.session) {
-          console.log("No valid session found, redirecting to login")
-          router.push("/login")
+        addDebug('🔍 Creating Supabase client...')
+        const supabase = createClientComponentClient()
+        
+        addDebug('👤 Getting current user session...')
+        
+        // Add timeout to getUser call
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('getUser timeout')), 5000)
+        })
+        
+        const getUserPromise = supabase.auth.getUser()
+        
+        let userResult: any
+        try {
+          userResult = await Promise.race([getUserPromise, timeoutPromise])
+          addDebug('✅ Standard getUser succeeded')
+        } catch (timeoutError: any) {
+          addDebug(`⏰ Standard getUser timed out: ${timeoutError?.message || 'timeout'}`)
+          addDebug('🔄 Trying direct session check...')
+          
+          // Fallback: try to get session directly
+          try {
+            addDebug('⏰ Adding timeout to session check...')
+            const sessionTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('getSession timeout')), 3000)
+            })
+            
+            const getSessionPromise = supabase.auth.getSession()
+            const sessionResult: any = await Promise.race([getSessionPromise, sessionTimeoutPromise])
+            
+            const { data: { session }, error: sessionError } = sessionResult
+            if (sessionError) throw sessionError
+            
+            if (session?.user) {
+              addDebug('✅ Direct session check found user')
+              userResult = { data: { user: session.user }, error: null }
+            } else {
+              addDebug('❌ Direct session check: no user found')
+              throw new Error('No session found')
+            }
+          } catch (sessionErr: any) {
+            addDebug(`❌ Direct session check failed: ${sessionErr?.message || 'unknown error'}`)
+            addDebug('🔄 Trying direct localStorage session...')
+            
+            // Final fallback: direct localStorage session check
+            try {
+              const directResult = await directGetUser()
+              if (directResult.error || !directResult.data.user) {
+                addDebug('❌ Direct localStorage session: no user found')
+                throw new Error('No stored session found')
+              }
+              
+              addDebug('✅ Direct localStorage session found user')
+              userResult = directResult
+            } catch (directErr: any) {
+              addDebug(`❌ Direct localStorage session failed: ${directErr?.message || 'unknown error'}`)
+              addDebug('🚨 All auth methods failed - redirecting to login')
+              addTiming('⏱️ All auth methods failed - redirecting to login')
+              router.push('/login')
+              return
+            }
+          }
+        }
+        
+        const { data: { user }, error: userError } = userResult
+        
+        if (userError) {
+          addDebug(`❌ User session error: ${userError.message}`)
+          setError(userError.message)
+          addTiming('⏱️ Redirecting to login due to session error')
+          router.push('/login')
           return
         }
 
-        console.log("Valid session found for user:", sessionData.session.user.id)
+        if (!user) {
+          addDebug('❌ No user found in session')
+          addTiming('⏱️ Redirecting to login - no user')
+          router.push('/login')
+          return
+        }
 
-        // Get user profile
-        console.log("Attempting to fetch profile for user ID:", sessionData.session.user.id)
+        addDebug(`✅ User found: ${user.email} (ID: ${user.id.substring(0, 8)}...)`)
+        setUser(user)
+
+        addDebug('📋 Loading user profile...')
         const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", sessionData.session.user.id)
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
           .single()
 
         if (profileError) {
-          // Log the initial error for debugging. Using JSON.stringify to see the full object.
-          console.log(`Initial profile fetch failed:`, JSON.stringify(profileError, null, 2))
-
-          // If profile doesn't exist (PGRST116) or we get a strange error without a code (like {}),
-          // we assume it's a race condition on first login and proceed to create/verify.
-          if (profileError.code === 'PGRST116' || !profileError.code) {
-            console.log("Profile not found or ambiguous error. Attempting to create/verify profile...")
-
-            try {
-              const { data: newProfile, error: createError } = await supabase
-                .from("profiles")
-                .insert({
-                  id: sessionData.session.user.id,
-                  email: sessionData.session.user.email,
-                  first_name: sessionData.session.user.user_metadata?.first_name || "",
-                  last_name: sessionData.session.user.user_metadata?.last_name || "",
-                  role: sessionData.session.user.user_metadata?.role || "student",
-                })
-                .select()
-                .single()
-
-              if (createError) {
-                // This block will likely run if the DB trigger created the profile just before this insert was attempted.
-                console.log("Could not create profile (likely already exists). Error:", createError.message)
-                
-                // Wait a moment for DB replication and try to fetch the profile again.
-                console.log("Retrying profile fetch...")
-                await new Promise(resolve => setTimeout(resolve, 500))
-                
-                const { data: retryProfile, error: retryError } = await supabase
-                  .from("profiles")
-                  .select("*")
-                  .eq("id", sessionData.session.user.id)
-                  .single()
-                
-                if (retryError) {
-                  // This is a more serious issue. The profile is missing even after creation was attempted and retried.
-                  console.warn("Profile still not found after retry. Using auth data as fallback.", retryError)
-                  setUser({
-                    id: sessionData.session.user.id,
-                    email: sessionData.session.user.email,
-                    first_name: sessionData.session.user.user_metadata?.first_name || "",
-                    last_name: sessionData.session.user.user_metadata?.last_name || "",
-                    role: sessionData.session.user.user_metadata?.role || "student",
-                  })
-                } else {
-                  console.log("Successfully fetched profile on retry:", retryProfile)
-                  setUser(retryProfile)
-                }
-              } else {
-                console.log("Profile created successfully by client:", newProfile)
-                setUser(newProfile)
-              }
-            } catch (insertError: any) {
-              console.warn("Unexpected error during profile creation attempt. Using fallback.", insertError.message)
-              setUser({
-                id: sessionData.session.user.id,
-                email: sessionData.session.user.email,
-                first_name: sessionData.session.user.user_metadata?.first_name || "",
-                last_name: sessionData.session.user.user_metadata?.last_name || "",
-                role: sessionData.session.user.user_metadata?.role || "student",
-              })
-            }
-          } else {
-            // This is for other, unexpected Postgrest errors (e.g., RLS issue, server down)
-            console.warn("An unexpected Supabase error occurred while fetching the profile:", profileError)
-            setUser({
-              id: sessionData.session.user.id,
-              email: sessionData.session.user.email,
-              role: sessionData.session.user.user_metadata?.role || "student",
-            })
-          }
-        } else if (!profileData) {
-          console.warn("No profile data was returned, but no error was thrown. This is unexpected.")
-          // Fallback to basic user info.
-          setUser({
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-            role: sessionData.session.user.user_metadata?.role || "student",
-          })
+          addDebug(`⚠️ Profile error: ${profileError.message}`)
+          setError(profileError.message)
         } else {
-          console.log("Profile loaded successfully:", profileData)
-          setUser(profileData)
+          addDebug(`✅ Profile loaded: ${profileData?.role || 'unknown role'}`)
+          setProfile(profileData)
         }
-      } catch (error) {
-        console.warn("Unexpected error in checkAuth:", error)
-        // Try to get basic session info even if profile loading fails
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (sessionData.session) {
-          setUser({
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-            first_name: sessionData.session.user.user_metadata?.first_name || "",
-            last_name: sessionData.session.user.user_metadata?.last_name || "",
-            role: sessionData.session.user.user_metadata?.role || "student",
-          })
-        } else {
-          router.push("/login")
-          return
-        }
-      } finally {
+
+        addTiming('⏱️ Authentication check completed successfully')
         setLoading(false)
+
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+        addDebug(`💥 Auth check failed: ${errorMsg}`)
+        setError(errorMsg)
+        addTiming('⏱️ Redirecting due to auth check failure')
+        router.push('/login')
       }
     }
 
     checkAuth()
   }, [router])
 
-  if (loading || settingsLoading) {
-    // Get the current theme from localStorage to show correct loading state
-    const currentTheme = typeof window !== "undefined" ? localStorage.getItem("taleem-theme") || "system" : "system"
-
-    const isDarkMode =
-      currentTheme === "dark" ||
-      (currentTheme === "system" &&
-        typeof window !== "undefined" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches)
-
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-16 h-16 border-4 border-muted border-t-primary rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <p className="mt-4 text-muted-foreground">Loading your account...</p>
+        </div>
+
+        {/* Debug Box 1: Auth Flow */}
+        {isDebugMode() && (
+          <div className="fixed top-4 left-4 bg-blue-900/90 text-white p-3 rounded-lg max-w-md z-50">
+            <h4 className="font-bold text-xs mb-2">🔐 Auth Flow Debug:</h4>
+            <div className="text-xs space-y-1 max-h-48 overflow-y-auto">
+              {debugData.map((info, index) => (
+                <div key={index} className="font-mono text-xs leading-tight">{info}</div>
+              ))}
+            </div>
+            <div className="text-xs mt-2 opacity-70 border-t border-blue-700 pt-1">
+              Loading: {loading.toString()} | User: {user ? 'Found' : 'None'}
+            </div>
+          </div>
+        )}
+
+        {/* Debug Box 2: Auth Timing */}
+        {isDebugMode() && (
+          <div className="fixed top-4 right-4 bg-purple-900/90 text-white p-3 rounded-lg max-w-md z-50">
+            <h4 className="font-bold text-xs mb-2">⏱️ Auth Timing:</h4>
+            <div className="text-xs space-y-1 max-h-48 overflow-y-auto">
+              {authTiming.map((info, index) => (
+                <div key={index} className="font-mono text-xs leading-tight">{info}</div>
+              ))}
+            </div>
+            <div className="text-xs mt-2 opacity-70 border-t border-purple-700 pt-1">
+              Steps: {authTiming.length} | Error: {error || 'None'}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
-  return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <AcademicHeader user={user} />
-      <main className="flex-1">{children}</main>
-    </div>
-  )
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Authentication error: {error}</p>
+          <button 
+            onClick={() => router.push('/login')}
+            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded"
+          >
+            Return to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return children
 }

@@ -11,51 +11,137 @@ export const createClientComponentClient = () => {
 
   // Check if configuration is valid
   if (!supabaseConfig.isValid()) {
-    console.error("Invalid Supabase configuration. Using fallback values which won't work in production.")
+    console.error("Invalid Supabase configuration. Check your environment variables.")
+    throw new Error("Invalid Supabase configuration")
   }
 
   try {
-    // Add retry logic and better error handling
-    const maxRetries = 3
-    let retryCount = 0
+    console.log("Creating Supabase client...")
 
-    const createClientWithRetry = () => {
-      try {
-        console.log(`Attempting to create Supabase client (attempt ${retryCount + 1}/${maxRetries})`)
-
-        // Ensure we have values for URL and key
-        if (!supabaseConfig.url || !supabaseConfig.anonKey) {
-          throw new Error("Missing Supabase URL or anon key")
-        }
-
-        clientInstance = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            storageKey: "taleem-auth-token",
-            detectSessionInUrl: true,
-          },
-        })
-        return clientInstance
-      } catch (error) {
-        console.error(`Error creating Supabase client (attempt ${retryCount + 1}):`, error)
-        retryCount++
-
-        if (retryCount < maxRetries) {
-          console.log(`Retrying client creation...`)
-          return createClientWithRetry()
-        }
-
-        throw new Error(
-          "Failed to initialize Supabase client after multiple attempts. Please check your configuration.",
-        )
-      }
+    // Ensure we have values for URL and key
+    if (!supabaseConfig.url || !supabaseConfig.anonKey) {
+      throw new Error("Missing Supabase URL or anon key")
     }
 
-    return createClientWithRetry()
+    clientInstance = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        storageKey: "taleem-auth-token",
+        detectSessionInUrl: true,
+      },
+    })
+
+    console.log("Supabase client created successfully")
+    return clientInstance
   } catch (error) {
     console.error("Error creating Supabase client:", error)
     throw new Error("Failed to initialize Supabase client. Please check your configuration.")
+  }
+}
+
+/**
+ * Direct authentication bypass - uses raw auth API when client fails
+ */
+export const directAuthSignIn = async (email: string, password: string) => {
+  if (!supabaseConfig.url || !supabaseConfig.anonKey) {
+    throw new Error("Supabase configuration missing")
+  }
+
+  try {
+    console.log("Attempting direct auth signin...")
+    
+    const response = await fetch(`${supabaseConfig.url}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseConfig.anonKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseConfig.anonKey}`
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error_description || errorData.message || 'Authentication failed')
+    }
+
+    const data = await response.json()
+    
+    // Store the session manually
+    if (data.access_token) {
+      localStorage.setItem('taleem-auth-token', JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in * 1000),
+        user: data.user
+      }))
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error("Direct auth signin failed:", error)
+    return { data: null, error }
+  }
+}
+
+/**
+ * Direct session check - retrieves stored session from localStorage
+ */
+export const directGetSession = async () => {
+  try {
+    const storedSession = localStorage.getItem('taleem-auth-token')
+    if (!storedSession) {
+      return { data: { session: null }, error: null }
+    }
+
+    const sessionData = JSON.parse(storedSession)
+    
+    // Check if session is expired
+    if (Date.now() > sessionData.expires_at) {
+      localStorage.removeItem('taleem-auth-token')
+      return { data: { session: null }, error: null }
+    }
+
+    // Return session in Supabase format
+    return {
+      data: {
+        session: {
+          access_token: sessionData.access_token,
+          refresh_token: sessionData.refresh_token,
+          expires_at: sessionData.expires_at,
+          user: sessionData.user
+        }
+      },
+      error: null
+    }
+  } catch (error) {
+    console.error("Direct session check failed:", error)
+    localStorage.removeItem('taleem-auth-token') // Clear corrupted session
+    return { data: { session: null }, error }
+  }
+}
+
+/**
+ * Direct user retrieval - gets user from stored session
+ */
+export const directGetUser = async () => {
+  try {
+    const sessionResult = await directGetSession()
+    if (sessionResult.error || !sessionResult.data.session) {
+      return { data: { user: null }, error: sessionResult.error }
+    }
+
+    return {
+      data: { user: sessionResult.data.session.user },
+      error: null
+    }
+  } catch (error) {
+    console.error("Direct user retrieval failed:", error)
+    return { data: { user: null }, error }
   }
 }
 
@@ -87,12 +173,13 @@ export async function getStudentCountForClass(client: any, classId: string): Pro
 
 /**
  * Returns the number of students assigned to an assignment (where profile role is 'student').
+ * Always uses the assignment_students table for static assignment tracking.
  * @param client Supabase client instance
  * @param assignmentId The assignment ID
  */
 export async function getStudentCountForAssignment(client: any, assignmentId: string): Promise<number> {
   try {
-    // First get all assignment_students for this assignment
+    // Count only students explicitly assigned via assignment_students table
     const { data: assignmentStudents, error: assignmentStudentsError } = await client
       .from('assignment_students')
       .select('student_id, profiles!inner(role)')
