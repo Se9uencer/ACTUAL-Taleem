@@ -137,11 +137,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           initialized: true
         })
       } else {
-        console.warn('[AuthContext] Failed to load profile, but user session is valid')
+          // Attempt to create a default profile when none is found
+  try {
+    const supabaseClient = createClient()
+    const { error: insertError } = await supabaseClient.from('profiles').insert({
+      id: session.user.id,
+      email: session.user.email?.toLowerCase().trim() ?? '',
+      role: 'student',
+    })
+    if (!insertError) {
+      const newProfile = await loadProfile(session.user.id)
+      if (newProfile) {
         setAuthState({
           user: session.user,
-          profile: null,
+          profile: newProfile,
           session,
+          loading: false,
+          error: null,
+          initialized: true,
+        })
+        return
+      } else {
+        console.warn('[AuthContext] Profile could not be loaded after creation')
+      }
+    } else {
+      console.error('[AuthContext] Profile creation error:', insertError)
+    }
+  } catch (createProfileError) {
+    console.error('[AuthContext] Failed to create missing profile:', createProfileError)
+  }
+  // Fall back to showing error if profile still cannot be loaded
+        
+        console.warn('[AuthContext] Failed to load profile, but user session is valid')
+        setAuthSt  ae({
+          user: session.user,
+          profile: null,
+          session
           loading: false,
           error: 'Failed to load user profile',
           initialized: true
