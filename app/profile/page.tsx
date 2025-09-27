@@ -8,6 +8,7 @@ import { createClientComponentClient } from "@/lib/supabase/client"
 import AuthenticatedLayout from "@/components/authenticated-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { CheckCircle, AlertCircle, Copy } from "lucide-react"
 import { dynamicAccent } from "@/lib/accent-utils"
 
@@ -188,6 +189,9 @@ export default function ProfilePage() {
   return (
     <AuthenticatedLayout>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="mb-6">
+          <BackButton href="/dashboard" label="Back to Dashboard" className="mb-4" />
+        </div>
         {/* Profile Information */}
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="border-b border-gray-100 bg-gray-50">

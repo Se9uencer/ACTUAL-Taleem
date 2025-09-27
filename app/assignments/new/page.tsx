@@ -8,6 +8,8 @@ import Link from "next/link"
 import { TaleemLogo } from "@/components/taleem-logo"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { supabaseConfig } from "@/lib/config"
+import AuthenticatedLayout from "@/components/authenticated-layout"
+import { BackButton } from "@/components/ui/back-button"
 import { surahData, getAyahCount, generateAssignmentTitle } from "@/lib/quran-data"
 // Import the date utility functions
 import { getTomorrowDatePST } from "@/lib/date-utils"
@@ -203,18 +205,21 @@ export default function NewAssignmentPage() {
     )
   }
 
+  const getBackHref = () => {
+    if (preselectedClassId) {
+      return `/classes/${preselectedClassId}`
+    }
+    return "/classes"
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <TaleemLogo className="h-8 w-auto text-purple-600 mr-2" />
+    <AuthenticatedLayout>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="mb-6">
+            <BackButton href={getBackHref()} label="Back to Classes" className="mb-4" />
             <h1 className="text-2xl font-bold text-gray-900">Create Assignment</h1>
           </div>
-        </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white shadow rounded-lg p-6">
           <form onSubmit={handleSubmit}>
             {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md"><p>{error}</p></div>}
@@ -286,8 +291,9 @@ export default function NewAssignmentPage() {
               </button>
             </div>
           </form>
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AuthenticatedLayout>
   )
 }

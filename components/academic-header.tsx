@@ -49,18 +49,6 @@ export function AcademicHeader({ user }: AcademicHeaderProps) {
                 Dashboard
               </Link>
 
-              <Link
-                href="/test-model"
-                className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                  isActive("/test-model")
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-muted-foreground hover:text-foreground hover:border-b-2 hover:border-muted"
-                }`}
-              >
-                <span className="mr-1 h-4 w-4">🧪</span>
-                Test Model
-              </Link>
-
               {user?.role === "teacher" && (
                 <Link
                   href="/classes"

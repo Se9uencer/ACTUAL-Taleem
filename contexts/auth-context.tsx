@@ -169,10 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fall back to showing error if profile still cannot be loaded
         
         console.warn('[AuthContext] Failed to load profile, but user session is valid')
-        setAuthSt  ae({
+        setAuthState({
           user: session.user,
           profile: null,
-          session
+          session,
           loading: false,
           error: 'Failed to load user profile',
           initialized: true

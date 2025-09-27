@@ -6,6 +6,8 @@ import Link from "next/link"
 import { TaleemLogo } from "@/components/taleem-logo"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { getStudentCountForClass } from '@/lib/supabase/client'
+import AuthenticatedLayout from "@/components/authenticated-layout"
+import { BackButton } from "@/components/ui/back-button"
 
 import {
   CopyIcon,
@@ -368,18 +370,13 @@ export default function ClassDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <TaleemLogo className={`h-8 w-auto ${dynamicAccent.icon.primary} mr-2`} />
+    <AuthenticatedLayout>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="mb-6">
+            <BackButton href="/classes" label="Back to Classes" className="mb-4" />
             <h1 className="text-2xl font-bold text-gray-900">Class Details</h1>
           </div>
-          <Link href="/dashboard" className={dynamicAccent.link.primary}>
-            Back to Dashboard
-          </Link>
-        </div>
-      </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -676,8 +673,8 @@ export default function ClassDetailsPage() {
           isDeleting={isDeleting}
         />
       )}
-    </div>
+        </div>
+      </div>
+    </AuthenticatedLayout>
   )
 }
-
-  return (

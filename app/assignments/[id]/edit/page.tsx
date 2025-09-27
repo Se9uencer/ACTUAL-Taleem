@@ -6,6 +6,8 @@ import Link from "next/link"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { TaleemLogo } from "@/components/taleem-logo"
 import { surahData, getAyahCount, generateAssignmentTitle } from "@/lib/quran-data"
+import AuthenticatedLayout from "@/components/authenticated-layout"
+import { BackButton } from "@/components/ui/back-button"
 import { ArrowLeft, Save } from "lucide-react"
 import { TimePicker } from "@/components/ui/time-picker"
 import { StudentSelector } from "@/components/ui/student-selector"
@@ -212,19 +214,13 @@ export default function EditAssignmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <div className="flex items-center">
-                <Link href={`/assignments/${assignmentId}`} className="text-gray-500 hover:text-gray-700 mr-4">
-                    <ArrowLeft className="h-6 w-6" />
-                </Link>
-                <h1 className="text-2xl font-bold text-gray-900">Edit Assignment</h1>
-            </div>
-        </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AuthenticatedLayout>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="mb-6">
+            <BackButton href={`/assignments/${assignmentId}`} label="Back to Assignment" className="mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900">Edit Assignment</h1>
+          </div>
         <div className="bg-white shadow rounded-lg p-6">
           <form onSubmit={handleSubmit}>
             {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md"><p>{error}</p></div>}
@@ -285,8 +281,9 @@ export default function EditAssignmentPage() {
               </button>
             </div>
           </form>
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AuthenticatedLayout>
   )
 } 

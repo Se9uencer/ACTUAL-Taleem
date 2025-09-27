@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { TaleemLogo } from "@/components/taleem-logo"
 import { createClientComponentClient } from "@/lib/supabase/client"
 import { ClaimChildForm } from "./claim-child-form"
 import { ChildrenList } from "./children-list"
 import { ChildProgressView } from "./child-progress-view"
 import { ChildrenPerformanceOverview } from "./children-performance-overview"
-import { dynamicAccent } from "@/lib/accent-utils"
+import AuthenticatedLayout from "@/components/authenticated-layout"
 
 export default function ParentDashboardPage() {
   const [profile, setProfile] = useState<any>(null)
@@ -153,86 +151,52 @@ export default function ParentDashboardPage() {
     }
   }
 
-  const handleSignOut = async () => {
-    if (supabase) {
-      try {
-        await supabase.auth.signOut()
-        router.push("/login")
-      } catch (error) {
-        console.error("Error signing out:", error)
-        alert("Failed to sign out. Please try again.")
-      }
-    }
-  }
-
   const handleViewProgress = (childId: string) => {
     setSelectedChildId(childId)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <TaleemLogo className={`h-12 w-auto ${dynamicAccent.icon.primary} mb-4`} />
-        <p className="text-gray-700 mb-2">Loading parent dashboard...</p>
-        <div className="w-16 h-1 bg-gray-200 rounded-full overflow-hidden">
-          <div className={`h-full ${dynamicAccent.button.primary} animate-pulse`}></div>
+      <AuthenticatedLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </AuthenticatedLayout>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-destructive/10 text-destructive border border-destructive/20 p-6 rounded-lg max-w-md w-full">
-          <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
-          <p className="mb-4">{error}</p>
-          <div className="flex flex-col sm:flex-row gap-2">
+      <AuthenticatedLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+              onClick={() => {
+                setError(null)
+                window.location.reload()
+              }}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
             >
-              Refresh Page
-            </button>
-            <button
-              onClick={() => router.push("/login")}
-              className={`px-4 py-2 ${dynamicAccent.button.primary} rounded transition-colors`}
-            >
-              Return to Login
+              Try Again
             </button>
           </div>
         </div>
-      </div>
+      </AuthenticatedLayout>
     )
   }
 
   return (
-          <div className="min-h-screen bg-background">
-              <header className="bg-card shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <TaleemLogo className={`h-8 w-auto ${dynamicAccent.icon.primary} mr-2`} />
-            <h1 className="text-2xl font-bold text-gray-900">Parent Dashboard</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-700">
-              {profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : profile.email} (
-              {profile.role})
-            </span>
-            <Link href="/dashboard" className={`text-sm ${dynamicAccent.link.primary}`}>
-              Dashboard
-            </Link>
-            <Link href="/profile" className={`text-sm ${dynamicAccent.link.primary}`}>
-              My Profile
-            </Link>
-            <button onClick={handleSignOut} className={`text-sm ${dynamicAccent.link.primary}`}>
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <AuthenticatedLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Claim Child Form */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Link Your Child's Account</h2>
@@ -266,7 +230,7 @@ export default function ParentDashboardPage() {
             <ChildProgressView childId={selectedChildId} />
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AuthenticatedLayout>
   )
 }
