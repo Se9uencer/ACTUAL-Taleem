@@ -137,38 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           initialized: true
         })
       } else {
-          // Attempt to create a default profile when none is found
-  try {
-    const supabaseClient = createClient()
-    const { error: insertError } = await supabaseClient.from('profiles').insert({
-      id: session.user.id,
-      email: session.user.email?.toLowerCase().trim() ?? '',
-      role: 'student',
-    })
-    if (!insertError) {
-      const newProfile = await loadProfile(session.user.id)
-      if (newProfile) {
-        setAuthState({
-          user: session.user,
-          profile: newProfile,
-          session,
-          loading: false,
-          error: null,
-          initialized: true,
-        })
-        return
-      } else {
-        console.warn('[AuthContext] Profile could not be loaded after creation')
-      }
-    } else {
-      console.error('[AuthContext] Profile creation error:', insertError)
-    }
-  } catch (createProfileError) {
-    console.error('[AuthContext] Failed to create missing profile:', createProfileError)
-  }
-  // Fall back to showing error if profile still cannot be loaded
-        
-        console.warn('[AuthContext] Failed to load profile, but user session is valid')
+        // Profile creation on signup is now handled by the Postgres trigger
+        // defined in supabase/migrations/create_profile_on_signup.sql, which
+        // fires AFTER INSERT on auth.users inside the same transaction. If no
+        // profile exists here, the trigger did not run (e.g. legacy account)
+        // or signup did not complete normally.
+        console.warn('[AuthContext] No profile found for authenticated user:', session.user.id.substring(0, 8) + '...')
         setAuthState({
           user: session.user,
           profile: null,
