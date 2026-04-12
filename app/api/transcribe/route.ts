@@ -10,10 +10,20 @@ import quranData from "@/quran.json"
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg",
-  "audio/mp3", 
+  "audio/mp3",
   "audio/x-m4a",
   "audio/wav"
 ]
+
+// Minimum fraction of expected words that must be present to consider a verse
+// attempted rather than missing entirely.
+const VERSE_WORD_BUFFER_RATIO = 0.2
+
+// Accuracy thresholds used to classify recitation quality for per-verse and
+// overall feedback shown to students and teachers.
+const ACCURACY_EXCELLENT_THRESHOLD = 0.95
+const ACCURACY_GOOD_THRESHOLD = 0.85
+const ACCURACY_NEEDS_IMPROVEMENT_THRESHOLD = 0.70
 
 // TODO: Future security enhancements
 // - Implement rate limiting per user (e.g., max 10 uploads per hour)
@@ -105,7 +115,7 @@ function generateVerseFeedback(transcribedText: string, expectedVerses: any[], s
     
     // Check if verse is completely missing or mostly empty
     const transcribedWordCount = verseTranscriptionWords.filter(word => word.trim().length > 0).length
-    const isMissing = transcribedWordCount === 0 || transcribedWordCount < Math.ceil(verseWordCount * 0.2) // Less than 20% of expected words
+    const isMissing = transcribedWordCount === 0 || transcribedWordCount < Math.ceil(verseWordCount * VERSE_WORD_BUFFER_RATIO)
     
     let verseAccuracy = 0
     let differences = []
@@ -134,9 +144,9 @@ function generateVerseFeedback(transcribedText: string, expectedVerses: any[], s
         }
       }
       
-      feedback = verseAccuracy >= 0.95 ? "Excellent!" : 
-                verseAccuracy >= 0.85 ? "Very good" : 
-                verseAccuracy >= 0.70 ? "Good effort" : "Needs practice"
+      feedback = verseAccuracy >= ACCURACY_EXCELLENT_THRESHOLD ? "Excellent!" :
+                verseAccuracy >= ACCURACY_GOOD_THRESHOLD ? "Very good" :
+                verseAccuracy >= ACCURACY_NEEDS_IMPROVEMENT_THRESHOLD ? "Good effort" : "Needs practice"
     }
     
     verseFeedback.push({
@@ -262,18 +272,18 @@ export async function POST(request: Request) {
     // Calculate overall verse statistics
     const verseAccuracies = verseFeedback.map(v => v.accuracy)
     const averageVerseAccuracy = verseAccuracies.reduce((sum, acc) => sum + acc, 0) / verseAccuracies.length
-    const excellentVerses = verseFeedback.filter(v => v.accuracy >= 0.95).length
-    const goodVerses = verseFeedback.filter(v => v.accuracy >= 0.70).length
+    const excellentVerses = verseFeedback.filter(v => v.accuracy >= ACCURACY_EXCELLENT_THRESHOLD).length
+    const goodVerses = verseFeedback.filter(v => v.accuracy >= ACCURACY_NEEDS_IMPROVEMENT_THRESHOLD).length
 
     // Generate overall feedback
     let feedback = ""
     const status = "completed"
 
-    if (averageVerseAccuracy >= 0.95) {
+    if (averageVerseAccuracy >= ACCURACY_EXCELLENT_THRESHOLD) {
       feedback = `Excellent recitation! ${excellentVerses}/${verseFeedback.length} verses were nearly perfect.`
-    } else if (averageVerseAccuracy >= 0.85) {
+    } else if (averageVerseAccuracy >= ACCURACY_GOOD_THRESHOLD) {
       feedback = `Very good recitation! ${excellentVerses} excellent verses, ${goodVerses} verses need minor improvement.`
-    } else if (averageVerseAccuracy >= 0.70) {
+    } else if (averageVerseAccuracy >= ACCURACY_NEEDS_IMPROVEMENT_THRESHOLD) {
       feedback = `Good effort! ${goodVerses}/${verseFeedback.length} verses were good. Keep practicing the challenging verses.`
     } else {
       feedback = `Keep practicing! Focus on individual verses for better pronunciation. ${goodVerses}/${verseFeedback.length} verses were acceptable.`
