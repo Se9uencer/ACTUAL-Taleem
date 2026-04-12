@@ -15,8 +15,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [message, setMessage] = useState<string | null>(null)
-  
-  const { signIn, loading, error, user, clearError } = useAuth()
+  const [submitting, setSubmitting] = useState(false)
+
+  const { signIn, error, user, clearError } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -42,15 +43,16 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!email || !password) {
       return
     }
 
+    setSubmitting(true)
     const result = await signIn(email.toLowerCase().trim(), password)
-    
+    setSubmitting(false)
+
     if (!result.error) {
-      // Success - redirect will happen via useEffect when user state updates
       router.push("/dashboard")
     }
   }
@@ -88,7 +90,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full"
-                    disabled={loading}
+                    disabled={submitting}
                   />
                 </div>
               </div>
@@ -107,7 +109,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full"
-                    disabled={loading}
+                    disabled={submitting}
                   />
                 </div>
               </div>
@@ -127,9 +129,9 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={loading || !email || !password}
+                  disabled={submitting || !email || !password}
                 >
-                  {loading ? "Signing in..." : "Sign in"}
+                  {submitting ? "Signing in..." : "Sign in"}
                 </Button>
               </div>
 

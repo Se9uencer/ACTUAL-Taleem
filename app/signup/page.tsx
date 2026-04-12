@@ -42,72 +42,24 @@ export default function SignupPage() {
     return code
   }
 
-  const createProfileDirectly = async (supabase: any, userId: string, userData: any) => {
-    try {
-      // Generate student ID if role is student
-      const studentId = userData.role === "student" ? generateStudentId() : null
+  const updateProfile = async (supabase: any, userId: string, userData: any) => {
+    const studentId = userData.role === "student" ? generateStudentId() : null
 
-      // First try to create the profile
-      const { error: insertError } = await supabase.from("profiles").insert({
-        id: userId,
+    const { error } = await supabase
+      .from("profiles")
+      .update({
         email: userData.email.toLowerCase().trim(),
-        first_name: userData.firstName || "",
-        last_name: userData.lastName || "",
+        first_name: userData.firstName || null,
+        last_name: userData.lastName || null,
         role: userData.role,
         grade: userData.grade || null,
         parent_email: userData.parentEmail || null,
         parent_phone: userData.parentPhone || null,
         student_id: studentId,
-        created_at: new Date().toISOString(),
-        school_id: null, // Explicitly set to null
       })
-
-      if (insertError) {
-        return false
-      }
-
-      return true
-    } catch (error: any) {
-      return false
-    }
-  }
-
-  const verifyProfileExists = async (supabase: any, userId: string, userData: any) => {
-    // Check if profile exists
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
       .eq("id", userId)
-      .maybeSingle()
 
-    if (profileError) {
-      return false
-    }
-
-    if (!profile) {
-      return await createProfileDirectly(supabase, userId, userData)
-    }
-
-    // Profile exists, check if role is correct
-    if (profile.role !== userData.role) {
-      const { error: updateError } = await supabase.from("profiles").update({ role: userData.role }).eq("id", userId)
-
-      if (updateError) {
-        return false
-      }
-    }
-
-    // Check if student_id exists for student role
-    if (userData.role === "student" && !profile.student_id) {
-      const studentId = generateStudentId()
-      const { error: updateError } = await supabase.from("profiles").update({ student_id: studentId }).eq("id", userId)
-
-      if (updateError) {
-        // Continue anyway
-      }
-    }
-
-    return true
+    return !error
   }
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -156,21 +108,19 @@ export default function SignupPage() {
         return
       }
 
-      // Step 2: After successful signup, immediately sign in the user
-      // The `handle_new_user` trigger in the DB will create the profile automatically.
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      // Update the profile row the DB trigger created with the full signup data
+      await updateProfile(supabase, signUpData.user.id, {
         email: normalizedEmail,
-        password,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        role,
+        grade: role === "student" ? grade : null,
+        parentEmail: role === "student" ? parentEmail : null,
+        parentPhone: role === "student" ? parentPhone : null,
       })
 
-      if (signInError) {
-        // If sign-in fails, redirect to login with a success message
-        router.push("/login?message=Account created! Please sign in to continue.")
-        return
-      }
-
-      // Step 3: Redirect to the dashboard on successful sign-in
-      router.push("/dashboard")
+      // Redirect to login so the user signs in manually
+      router.push("/login?message=Account created! Please sign in to continue.")
     } catch (error: any) {
       console.error("Unexpected Signup Error:", error)
       setError("An unexpected error occurred. Please try again.")
@@ -376,7 +326,7 @@ export default function SignupPage() {
                         disabled={loading}
                         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
                     >
-                        {loading ? "Creating account..." : "Sign up"}
+                        {loading ? "Creating account..." : "Create account"}
                     </button>
                     </div>
                 </form>

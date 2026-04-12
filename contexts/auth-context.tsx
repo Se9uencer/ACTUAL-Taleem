@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -55,7 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
 
   const router = useRouter()
-  const supabase = createClient()
+  // useMemo ensures the same client instance is used across all renders.
+  // Without this, every re-render (e.g. setLoading) creates a new supabase
+  // object which changes supabase.auth, re-triggers the useEffect, and spawns
+  // duplicate auth subscriptions / parallel loadProfile calls that hang.
+  const supabase = useMemo(() => createClient(), [])
 
   const setLoading = (loading: boolean) => {
     setAuthState(prev => ({ ...prev, loading }))
@@ -71,11 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Profile query timed out after 5s')), 5000)
+      )
+      const query = supabase.from('profiles').select('*').eq('id', userId).single()
+      const { data: profileData, error: profileError } = await Promise.race([query, timeout])
 
       if (profileError) {
         console.error('Profile loading error:', profileError)
@@ -106,10 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase])
 
   const updateAuthState = useCallback(async (session: Session | null) => {
-    console.log('[AuthContext] Updating auth state with session:', session ? 'Present' : 'Null')
-    
     if (!session?.user) {
-      console.log('[AuthContext] No session or user, clearing auth state')
       setAuthState({
         user: null,
         profile: null,
@@ -121,47 +122,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    console.log('[AuthContext] Loading profile for user:', session.user.id.substring(0, 8) + '...')
-    
+    // Unblock navigation immediately — set user/session without waiting for profile
+    setAuthState({
+      user: session.user,
+      profile: null,
+      session,
+      loading: false,
+      error: null,
+      initialized: true
+    })
+
+    // Load profile in the background — updates state when ready
     try {
       const profile = await loadProfile(session.user.id)
-      
       if (profile) {
-        console.log('[AuthContext] Profile loaded successfully:', profile.role)
-        setAuthState({
-          user: session.user,
-          profile,
-          session,
-          loading: false,
-          error: null,
-          initialized: true
-        })
-      } else {
-        // Profile creation on signup is now handled by the Postgres trigger
-        // defined in supabase/migrations/create_profile_on_signup.sql, which
-        // fires AFTER INSERT on auth.users inside the same transaction. If no
-        // profile exists here, the trigger did not run (e.g. legacy account)
-        // or signup did not complete normally.
-        console.warn('[AuthContext] No profile found for authenticated user:', session.user.id.substring(0, 8) + '...')
-        setAuthState({
-          user: session.user,
-          profile: null,
-          session,
-          loading: false,
-          error: 'Failed to load user profile',
-          initialized: true
-        })
+        setAuthState(prev => ({ ...prev, profile }))
       }
     } catch (error) {
       console.error('[AuthContext] Error loading profile:', error)
-      setAuthState({
-        user: session.user,
-        profile: null,
-        session,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to load profile',
-        initialized: true
-      })
     }
   }, [loadProfile])
 
