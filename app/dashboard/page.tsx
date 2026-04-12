@@ -17,19 +17,54 @@ import { StudentDashboard } from "./student-dashboard"
 import { ParentDashboard } from "./parent-dashboard"
 import { ClassDeletionBanner } from "@/components/ui/class-deletion-banner"
 import { useAuth } from "@/contexts/auth-context"
+import { Assignment, Recitation } from "@/types"
+
+// Classes returned by both teacher (full select + schools join + student_count)
+// and student (inner join returning a subset of columns + schools join).
+interface DashboardClass {
+  id: string
+  name: string
+  grade_level: string
+  teacher_id: string
+  created_at: string | null
+  schools: { name: string } | null
+  student_count?: number
+}
+
+// Recitation row after client-side enrichment for the late submissions alert.
+interface LateSubmission {
+  id: string
+  submitted_at: string
+  assignment_id: string
+  assignments: {
+    title: string | null
+    due_date: string | null
+    teacher_id: string | null
+    surah_name: string | null
+    start_ayah: number | null
+    end_ayah: number | null
+  }
+  profiles: {
+    first_name: string | null
+    last_name: string | null
+  }
+  student: string
+  assignment: string
+  due_date: string | null
+}
 
 export default function DashboardPage() {
-  const [classes, setClasses] = useState<any[]>([])
-  const [assignments, setAssignments] = useState<any[]>([])
-  const [recitations, setRecitations] = useState<any[]>([])
-  const [completedAssignments, setCompletedAssignments] = useState<any[]>([])
-  const [lateSubmissions, setLateSubmissions] = useState<any[]>([])
+  const [classes, setClasses] = useState<DashboardClass[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [recitations, setRecitations] = useState<Recitation[]>([])
+  const [completedAssignments, setCompletedAssignments] = useState<Assignment[]>([])
+  const [lateSubmissions, setLateSubmissions] = useState<LateSubmission[]>([])
   const [showLateAlert, setShowLateAlert] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleteModalData, setDeleteModalData] = useState<{
     isOpen: boolean
-    assignment: any | null
+    assignment: Assignment | null
   }>({ isOpen: false, assignment: null })
   const { deleteAssignment, isDeleting } = useAssignmentDeletion()
 
