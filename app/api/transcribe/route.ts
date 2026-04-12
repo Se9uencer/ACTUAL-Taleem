@@ -26,10 +26,36 @@ const ACCURACY_GOOD_THRESHOLD = 0.85
 const ACCURACY_NEEDS_IMPROVEMENT_THRESHOLD = 0.70
 
 // TODO: Future security enhancements
-// - Implement rate limiting per user (e.g., max 10 uploads per hour)
 // - Add virus scanning for uploaded files
 // - Add file content validation beyond MIME type checking
 // - Implement file hash verification for duplicate detection
+
+// ---------------------------------------------------------------------------
+// Rate limiting — sliding window, in-process store
+// ---------------------------------------------------------------------------
+// NOTE: This store is per-process and resets on server restart / cold start.
+// For multi-instance deployments, replace with a shared store (e.g. Redis).
+
+const RATE_LIMIT_MAX = 10
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
+
+const rateLimitStore = new Map<string, number[]>()
+
+function checkRateLimit(userId: string): { allowed: boolean; retryAfterSeconds?: number } {
+  const now = Date.now()
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+  const timestamps = (rateLimitStore.get(userId) ?? []).filter(t => t > windowStart)
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    const retryAfterSeconds = Math.ceil((timestamps[0] + RATE_LIMIT_WINDOW_MS - now) / 1000)
+    rateLimitStore.set(userId, timestamps)
+    return { allowed: false, retryAfterSeconds }
+  }
+
+  timestamps.push(now)
+  rateLimitStore.set(userId, timestamps)
+  return { allowed: true }
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -195,6 +221,18 @@ export async function POST(request: Request) {
     
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized: Invalid session." }, { status: 401 })
+    }
+
+    // Rate limit check
+    const rateLimit = checkRateLimit(user.id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Max 10 recitations per hour." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        }
+      )
     }
 
     // Parse form data

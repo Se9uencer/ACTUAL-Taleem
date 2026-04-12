@@ -324,6 +324,42 @@ describe("POST /api/transcribe", () => {
   })
 
   // -------------------------------------------------------------------------
+  // Rate limiting
+  // -------------------------------------------------------------------------
+  describe("rate limiting", () => {
+    it("returns 429 with Retry-After header after 10 requests from the same user within an hour", async () => {
+      // Use a dedicated user ID so other tests' requests don't pollute this bucket.
+      // Each request needs a fresh service client instance so the recitationCalls
+      // counter inside makeMockServiceClient doesn't carry over between requests.
+      mocks.authGetUser.mockResolvedValue({
+        data: { user: { id: "rate-limit-test-user" } },
+        error: null,
+      })
+      mocks.createServiceRoleClient.mockImplementation(() => makeMockServiceClient())
+
+      const makeRequest = () => {
+        const formData = new FormData()
+        formData.append("file", makeAudioFile())
+        formData.append("assignmentId", "assignment-xyz")
+        return POST(makeAuthorizedRequest(formData, "rate-limit-token"))
+      }
+
+      // Exhaust the 10-request allowance
+      for (let i = 0; i < 10; i++) {
+        const res = await makeRequest()
+        expect(res.status).toBe(200)
+      }
+
+      // 11th request must be rejected
+      const response = await makeRequest()
+      expect(response.status).toBe(429)
+      const body = await response.json()
+      expect(body.error).toMatch(/Rate limit exceeded/i)
+      expect(response.headers.get("Retry-After")).toBeTruthy()
+    })
+  })
+
+  // -------------------------------------------------------------------------
   // DB error paths
   // -------------------------------------------------------------------------
   describe("database error handling", () => {
