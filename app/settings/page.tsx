@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { LogOut, User, Mail, Shield, FileText } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { AccentColorSelector } from "@/components/ui/accent-color-selector"
 
 export default function SettingsPage() {
@@ -71,11 +71,7 @@ export default function SettingsPage() {
       router.push("/login")
     } catch (error) {
       console.error("Error signing out:", error)
-      toast({
-        title: "Error signing out",
-        description: "There was a problem signing out. Please try again.",
-        variant: "destructive",
-      })
+      toast.error("Error signing out", { description: "There was a problem signing out. Please try again." })
     }
   }
 

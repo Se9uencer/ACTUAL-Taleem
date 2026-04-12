@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Mic, Square, Play, Pause, Upload, AlertCircle } from "lucide-react"
 import { createClientComponentClient } from "@/lib/supabase/client"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { isPastDuePST } from "@/lib/date-utils"
 
 interface RecitationRecorderProps {
@@ -360,8 +360,7 @@ export function RecitationRecorder({ assignmentId, studentId, onRecitationSubmit
 
       const result = await response.json();
 
-      toast({
-        title: "Recitation Submitted Successfully!",
+      toast.success("Recitation Submitted Successfully!", {
         description: `Accuracy: ${result.accuracy}% - ${result.feedback.split('\n')[0]}`,
       });
       
@@ -374,11 +373,7 @@ export function RecitationRecorder({ assignmentId, studentId, onRecitationSubmit
       else errorMsg = JSON.stringify(err);
       setError(errorMsg);
       setIsUploading(false);
-      toast({
-        title: "Submission Failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
+      toast.error("Submission Failed", { description: errorMsg });
     }
   };
   

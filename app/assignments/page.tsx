@@ -8,7 +8,7 @@ import AuthenticatedLayout from "@/components/authenticated-layout"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import {
   BookOpen,
   CheckCircle,
@@ -42,10 +42,7 @@ export default function AssignmentsPage() {
 
     // Show success message if present
     if (message) {
-      toast({
-        title: "Success",
-        description: message,
-      })
+      toast.success(message)
     }
   }, [initialTab, message])
 
@@ -287,10 +284,7 @@ export default function AssignmentsPage() {
     setError(null) // Clear previous errors
     try {
       await loadData()
-      toast({
-        title: "Assignments Updated",
-        description: "Your assignments have been successfully refreshed.",
-      })
+      toast.success("Assignments Updated", { description: "Your assignments have been successfully refreshed." })
     } catch (error: any) {
       setError(error.message)
     } finally {

@@ -3,7 +3,6 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { SettingsProvider } from "@/contexts/settings-context"
 import { AuthProvider } from "@/contexts/auth-context"
-import { Toaster } from "@/components/ui/toaster"
 import { Toaster as Sonner } from "sonner"
 import { ThemeScript } from "./theme-script"
 
@@ -27,7 +26,6 @@ export default function RootLayout({
         <AuthProvider>
           <SettingsProvider>{children}</SettingsProvider>
         </AuthProvider>
-        <Toaster />
         <Sonner />
       </body>
     </html>

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { createClientComponentClient } from "@/lib/supabase/client"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 interface UseAssignmentDeletionReturn {
   deleteAssignment: (assignmentId: string) => Promise<boolean>
@@ -24,27 +24,16 @@ export function useAssignmentDeletion(): UseAssignmentDeletionReturn {
 
       if (error) {
         console.error("Error deleting assignment:", error)
-        toast({
-          title: "Error",
-          description: `Failed to delete assignment: ${error.message}`,
-          variant: "destructive",
-        })
+        toast.error("Error", { description: `Failed to delete assignment: ${error.message}` })
         return false
       }
 
-      toast({
-        title: "Success",
-        description: "Assignment deleted successfully",
-      })
+      toast.success("Assignment deleted successfully")
       
       return true
     } catch (error: any) {
       console.error("Error deleting assignment:", error)
-      toast({
-        title: "Error",
-        description: `Failed to delete assignment: ${error.message}`,
-        variant: "destructive",
-      })
+      toast.error("Error", { description: `Failed to delete assignment: ${error.message}` })
       return false
     } finally {
       setIsDeleting(false)

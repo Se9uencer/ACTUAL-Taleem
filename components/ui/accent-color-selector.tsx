@@ -9,7 +9,7 @@ import {
   updateUserThemeAccentColorDirect,
   getUserThemeAccentColorDirect 
 } from "@/lib/theme-utils"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 interface AccentColorSelectorProps {
@@ -80,8 +80,7 @@ export function AccentColorSelector({
         onColorChange?.(color)
         
         // Show success toast
-        toast({
-          title: "✅ Accent color updated",
+        toast.success("Accent color updated", {
           description: `Your theme is now ${COLOR_LABELS[color].toLowerCase()}.`,
           duration: 2000,
         })
@@ -90,11 +89,7 @@ export function AccentColorSelector({
       }
     } catch (error) {
       console.error("Error updating accent color:", error)
-      toast({
-        title: "Failed to update accent color",
-        description: "Please try again.",
-        variant: "destructive",
-      })
+      toast.error("Failed to update accent color", { description: "Please try again." })
     } finally {
       setIsSaving(false)
     }
