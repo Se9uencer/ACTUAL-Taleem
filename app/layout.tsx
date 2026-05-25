@@ -22,7 +22,7 @@ export default function RootLayout({
       <head>
         <ThemeScript />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <SettingsProvider>{children}</SettingsProvider>
         </AuthProvider>

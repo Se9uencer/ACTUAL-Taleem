@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, BookOpen, CheckCircle, User, Calendar } from "lucide-react"
+import { Users, BookOpen, CheckCircle, User, Calendar, Trophy, Flame } from "lucide-react"
 import { formatDatePST } from "@/lib/date-utils"
+import type { StudentStreak, EarnedBadge } from "./dashboard-client"
 
 // Helper function to generate assignment title
 const generateAssignmentTitle = (surahName: string, startAyah: number, endAyah: number) => {
@@ -15,14 +16,110 @@ const generateAssignmentTitle = (surahName: string, startAyah: number, endAyah: 
   return `${surahNameOnly} - Ayahs ${startAyah}-${endAyah}`
 }
 
+// ── Streak Card ──────────────────────────────────────────────────────────────
+
+function StreakCard({ streak }: { streak: StudentStreak | null }) {
+  const current = streak?.current_streak ?? 0
+  const longest = streak?.longest_streak ?? 0
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1 mb-4">
+        Your Streak
+      </h2>
+      <Card className="border border-gray-200 shadow-sm">
+        <CardContent className="p-4 flex items-center gap-4">
+          <div className="flex-shrink-0 flex items-center justify-center w-14 h-14 rounded-full bg-orange-100">
+            <Flame className="h-7 w-7 text-orange-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            {current > 0 ? (
+              <>
+                <p className="text-2xl font-bold text-orange-500 leading-none">
+                  {current} {current === 1 ? "day" : "days"}
+                </p>
+                <p className="text-sm text-gray-500 mt-0.5">current streak</p>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-semibold text-gray-700">No active streak</p>
+                <p className="text-sm text-gray-500 mt-0.5">Submit a recitation to start one!</p>
+              </>
+            )}
+          </div>
+          {longest > 0 && (
+            <div className="flex-shrink-0 text-right">
+              <p className="text-lg font-bold text-gray-700">{longest}</p>
+              <p className="text-xs text-gray-500">best</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
+// ── Badges Section ────────────────────────────────────────────────────────────
+
+function BadgesSection({ badges }: { badges: EarnedBadge[] }) {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1 mb-4">
+        Badges
+      </h2>
+      {badges.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          {badges.map((badge) => (
+            <Card key={badge.id} className="border border-gray-200 shadow-sm" title={badge.description ?? badge.name}>
+              <CardContent className="p-3 flex items-center gap-2">
+                {badge.icon_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={badge.icon_url}
+                    alt={badge.name}
+                    className="w-8 h-8 object-contain flex-shrink-0"
+                  />
+                ) : (
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100">
+                    <Trophy className="h-4 w-4 text-yellow-600" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 truncate">{badge.name}</p>
+                  {badge.points != null && (
+                    <p className="text-xs text-gray-500">{badge.points} pts</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+            <Trophy className="h-8 w-8 text-gray-300" />
+            <p className="text-sm text-gray-500">Complete assignments to earn badges!</p>
+          </CardContent>
+        </Card>
+      )}
+    </section>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export function StudentDashboard({
   classes,
   assignments,
   completedAssignments,
+  streak,
+  badges,
 }: {
   classes: any[]
   assignments: any[]
   completedAssignments: any[]
+  streak: StudentStreak | null
+  badges: EarnedBadge[]
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -106,8 +203,12 @@ export function StudentDashboard({
         </section>
       </div>
 
-      {/* Right Column - Assignments & Progress */}
+      {/* Right Column - Streak, Assignments, Progress, Badges */}
       <div className="space-y-6">
+        {/* Streak */}
+        <StreakCard streak={streak} />
+
+        {/* Assignments */}
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1">
@@ -178,7 +279,7 @@ export function StudentDashboard({
           )}
         </section>
 
-        {/* Your Progress */}
+        {/* Progress counts */}
         <section>
           <h2 className="text-lg font-semibold text-gray-900 border-b-2 border-primary/20 pb-1 mb-4">
             Your Progress
@@ -202,7 +303,10 @@ export function StudentDashboard({
             </Card>
           </div>
         </section>
+
+        {/* Badges */}
+        <BadgesSection badges={badges} />
       </div>
     </div>
   )
-} 
+}

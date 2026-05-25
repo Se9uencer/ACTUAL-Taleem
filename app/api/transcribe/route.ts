@@ -3,8 +3,10 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
 import { createClient } from "@supabase/supabase-js"
 import { supabaseConfig } from "@/lib/config"
 import { normalizeArabicText, calculateSimilarity } from "@/lib/arabic-utils"
+import { getExpectedVerses, getIndividualVerses } from "@/lib/quran-data"
 import OpenAI from 'openai'
-import quranData from "@/quran.json"
+import { Ratelimit } from "@upstash/ratelimit"
+import { Redis } from "@upstash/redis"
 
 // File upload security constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -31,17 +33,49 @@ const ACCURACY_NEEDS_IMPROVEMENT_THRESHOLD = 0.70
 // - Implement file hash verification for duplicate detection
 
 // ---------------------------------------------------------------------------
-// Rate limiting — sliding window, in-process store
+// Rate limiting — sliding window
 // ---------------------------------------------------------------------------
-// NOTE: This store is per-process and resets on server restart / cold start.
-// For multi-instance deployments, replace with a shared store (e.g. Redis).
+// Uses Upstash Redis when UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN
+// are set (production / staging). Falls back to an in-process Map for local
+// dev and the test suite, where no Redis instance is available.
 
 const RATE_LIMIT_MAX = 10
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 
+// ── In-process fallback ───────────────────────────────────────────────────
 const rateLimitStore = new Map<string, number[]>()
 
-function checkRateLimit(userId: string): { allowed: boolean; retryAfterSeconds?: number } {
+// ── Upstash singleton (lazily initialised) ────────────────────────────────
+let _upstashLimiter: Ratelimit | null = null
+
+function getUpstashLimiter(): Ratelimit | null {
+  if (_upstashLimiter) return _upstashLimiter
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return null
+  const redis = new Redis({ url, token })
+  _upstashLimiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(RATE_LIMIT_MAX, "1 h"),
+    analytics: true,
+    prefix: "taleem_rl",
+  })
+  return _upstashLimiter
+}
+
+async function checkRateLimit(userId: string): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  const limiter = getUpstashLimiter()
+
+  if (limiter) {
+    // Upstash path — shared across all instances
+    const { success, reset } = await limiter.limit(userId)
+    if (!success) {
+      return { allowed: false, retryAfterSeconds: Math.ceil((reset - Date.now()) / 1000) }
+    }
+    return { allowed: true }
+  }
+
+  // In-process fallback — sufficient for single-instance / tests
   const now = Date.now()
   const windowStart = now - RATE_LIMIT_WINDOW_MS
   const timestamps = (rateLimitStore.get(userId) ?? []).filter(t => t > windowStart)
@@ -85,42 +119,6 @@ function validateAudioFile(file: File): { isValid: boolean; error?: string } {
   }
 
   return { isValid: true }
-}
-
-// Get expected verses from quran.json
-function getExpectedVerses(surahNumber: number, startAyah: number, endAyah: number): string {
-  const surahData = quranData[surahNumber.toString() as keyof typeof quranData]
-  if (!surahData) return ""
-  
-  const verses = []
-  for (let ayah = startAyah; ayah <= endAyah; ayah++) {
-    const verse = surahData.find(v => v.verse === ayah)
-    if (verse) {
-      verses.push(verse.text)
-    }
-  }
-  
-  return verses.join(' ')
-}
-
-// Get individual verses for detailed comparison
-function getIndividualVerses(surahNumber: number, startAyah: number, endAyah: number) {
-  const surahData = quranData[surahNumber.toString() as keyof typeof quranData]
-  if (!surahData) return []
-  
-  const verses = []
-  for (let ayah = startAyah; ayah <= endAyah; ayah++) {
-    const verse = surahData.find(v => v.verse === ayah)
-    if (verse) {
-      verses.push({
-        ayah: ayah,
-        text: verse.text,
-        normalizedText: normalizeArabicText(verse.text)
-      })
-    }
-  }
-  
-  return verses
 }
 
 // Generate verse-by-verse feedback
@@ -224,7 +222,7 @@ export async function POST(request: Request) {
     }
 
     // Rate limit check
-    const rateLimit = checkRateLimit(user.id)
+    const rateLimit = await checkRateLimit(user.id)
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Max 10 recitations per hour." },
@@ -275,7 +273,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid assignment configuration" }, { status: 400 })
     }
 
-    // Get expected verses from quran.json
     const expectedText = getExpectedVerses(surahNumber, assignment.start_ayah, assignment.end_ayah)
     const individualVerses = getIndividualVerses(surahNumber, assignment.start_ayah, assignment.end_ayah)
     
@@ -295,6 +292,28 @@ export async function POST(request: Request) {
 
     if (!transcribedText) {
       return NextResponse.json({ error: "Transcription failed: No text detected" }, { status: 400 })
+    }
+
+    // Upload audio to Supabase Storage (non-fatal — recitation is saved even if upload fails)
+    let audioStoragePath: string | null = null
+    try {
+      const ext =
+        audioFile.name?.split(".").pop()?.toLowerCase() ||
+        audioFile.type.split("/")[1]?.replace("x-m4a", "m4a") ||
+        "audio"
+      const storagePath = `${user.id}/${assignmentId}/${Date.now()}.${ext}`
+      const arrayBuffer = await audioFile.arrayBuffer()
+      const { error: uploadError } = await serviceSupabase.storage
+        .from("recitations")
+        .upload(storagePath, arrayBuffer, { contentType: audioFile.type, upsert: false })
+      if (uploadError) {
+        console.error("[transcribe] Audio storage upload failed:", uploadError.message)
+      } else {
+        audioStoragePath = storagePath
+      }
+    } catch (uploadErr) {
+      console.error("[transcribe] Audio storage upload error:", uploadErr)
+      // Non-fatal — continue without audio_url
     }
 
     // Normalize texts for comparison
@@ -333,6 +352,7 @@ export async function POST(request: Request) {
       .insert({
         assignment_id: assignmentId,
         student_id: user.id,
+        audio_url: audioStoragePath,
         transcription: transcribedText,
         transcription_status: status,
         submitted_at: new Date().toISOString(),

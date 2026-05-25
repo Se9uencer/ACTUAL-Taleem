@@ -1,4 +1,48 @@
 import type { Surah } from "@/types";
+import rawQuranVerses from "./quran.json";
+import { normalizeArabicText } from "./arabic-utils";
+
+// Verse text data — keyed by surah number string.
+// NOTE: importing this module in client components bundles all verse text
+// (~1.7 MB) into the route chunk. Prefer server components or server actions
+// when only verse lookups are needed.
+type QuranVerse = { verse: number; text: string };
+const quranVerses = rawQuranVerses as Record<string, QuranVerse[]>;
+
+export interface IndividualVerse {
+  ayah: number;
+  text: string;
+  normalizedText: string;
+}
+
+export function getExpectedVerses(
+  surahNumber: number,
+  startAyah: number,
+  endAyah: number
+): string {
+  const verses = quranVerses[String(surahNumber)];
+  if (!verses) return "";
+  return verses
+    .filter((v) => v.verse >= startAyah && v.verse <= endAyah)
+    .map((v) => v.text)
+    .join(" ");
+}
+
+export function getIndividualVerses(
+  surahNumber: number,
+  startAyah: number,
+  endAyah: number
+): IndividualVerse[] {
+  const verses = quranVerses[String(surahNumber)];
+  if (!verses) return [];
+  return verses
+    .filter((v) => v.verse >= startAyah && v.verse <= endAyah)
+    .map((v) => ({
+      ayah: v.verse,
+      text: v.text,
+      normalizedText: normalizeArabicText(v.text),
+    }));
+}
 
 // Surah information with name and number of ayahs
 export const surahData: Surah[] = [

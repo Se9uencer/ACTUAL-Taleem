@@ -10,7 +10,7 @@ import { TaleemLogo } from "@/components/taleem-logo"
 import { Plus, Trash2 } from "lucide-react"
 import { dynamicAccent } from "@/lib/accent-utils"
 import { isDebugMode } from "@/lib/debug-utils"
-import { NewClassModal } from "./new-class-modal"
+import NewClassModal from "./new-class-modal"
 import { DeleteClassModal } from "@/components/ui/delete-class-modal"
 
 interface Class {
@@ -98,7 +98,6 @@ export default function ClassesPage() {
           }
 
           addAuthDebug(`✅ Session found for user: ${sessionData.session.user.id}`)
-          setUser(sessionData.session.user)
 
           // Get user profile
           addDataDebug("🔍 Fetching user profile...")
@@ -428,9 +427,16 @@ export default function ClassesPage() {
       <NewClassModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => {
+        onSubmit={async (classData) => {
+          const client = createClientComponentClient()
+          const { data: session } = await client.auth.getSession()
+          const { error } = await client.from("classes").insert({
+            ...classData,
+            teacher_id: session.session?.user.id,
+          })
+          if (error) throw new Error(error.message)
           setIsModalOpen(false)
-          loadData()
+          await loadData()
         }}
       />
 
@@ -441,6 +447,7 @@ export default function ClassesPage() {
         onConfirm={handleDeleteConfirm}
         className={deleteModalData.class?.name || ""}
         studentCount={deleteModalData.class?.student_count || 0}
+        isDeleting={false}
       />
     </div>
   )

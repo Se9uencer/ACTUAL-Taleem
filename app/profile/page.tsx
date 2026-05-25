@@ -4,8 +4,9 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import AuthenticatedLayout from "@/components/authenticated-layout"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BackButton } from "@/components/ui/back-button"
@@ -13,8 +14,7 @@ import { CheckCircle, AlertCircle, Copy } from "lucide-react"
 import { dynamicAccent } from "@/lib/accent-utils"
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, profile: authProfile } = useAuth()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -30,71 +30,22 @@ export default function ProfilePage() {
 
   const router = useRouter()
 
+  // Populate form when auth profile is available
   useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        setLoading(true)
-        const supabase = createClientComponentClient()
-
-        // Check if user is authenticated
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-
-        if (sessionError) {
-          throw new Error(`Authentication error: ${sessionError.message}`)
-        }
-
-        if (!sessionData.session) {
-          router.push("/login")
-          return
-        }
-
-        const userId = sessionData.session.user.id
-
-        // Get user profile
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", userId)
-          .single()
-
-        if (profileError) {
-          throw new Error(`Failed to load profile: ${profileError.message}`)
-        }
-
-        if (!profileData) {
-          throw new Error("Profile not found")
-        }
-
-        // If student_id doesn't exist and role is student, generate one
-        if (profileData.role === "student" && !profileData.student_id) {
-          const studentId = await generateAndSaveStudentId(supabase, userId)
-          if (studentId) {
-            profileData.student_id = studentId
-          }
-        }
-
-        setProfile(profileData)
-        setFormData({
-          first_name: typeof profileData.first_name === 'string' ? profileData.first_name : "",
-          last_name: typeof profileData.last_name === 'string' ? profileData.last_name : "",
-          email: typeof profileData.email === 'string' ? profileData.email : "",
-          grade: typeof profileData.grade === 'string' ? profileData.grade : "",
-          parent_email: typeof profileData.parent_email === 'string' ? profileData.parent_email : "",
-          parent_phone: typeof profileData.parent_phone === 'string' ? profileData.parent_phone : "",
-        })
-      } catch (error: any) {
-        console.error("Error loading profile:", error)
-        setError(error.message || "An unexpected error occurred")
-      } finally {
-        setLoading(false)
-      }
+    if (authProfile) {
+      setFormData({
+        first_name: authProfile.first_name ?? "",
+        last_name: authProfile.last_name ?? "",
+        email: authProfile.email ?? "",
+        grade: (authProfile as any).grade ?? "",
+        parent_email: (authProfile as any).parent_email ?? "",
+        parent_phone: (authProfile as any).parent_phone ?? "",
+      })
     }
-
-    loadProfile()
-  }, [router])
+  }, [authProfile])
 
   // Generate a unique student ID and save it to the profile
-  const generateAndSaveStudentId = async (supabase: any, userId: string) => {
+  const generateAndSaveStudentId = async (supabaseClient: any, userId: string) => {
     try {
       // Generate a student ID in format TLMXXXXXX (where X is alphanumeric, no dashes)
       const generateCode = () => {
@@ -112,7 +63,7 @@ export default function ProfilePage() {
       const studentId = generateCode()
 
       // Save the student ID to the profile
-      const { error } = await supabase.from("profiles").update({ student_id: studentId }).eq("id", userId)
+      const { error } = await supabaseClient.from("profiles").update({ student_id: studentId }).eq("id", userId)
 
       if (error) {
         console.error("Error saving student ID:", error)
@@ -136,14 +87,14 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profile) return
+    if (!authProfile) return
 
     try {
       setSaving(true)
       setError(null)
       setSuccessMessage(null)
 
-      const supabase = createClientComponentClient()
+      const supabase = createClient()
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -153,7 +104,7 @@ export default function ProfilePage() {
           parent_email: formData.parent_email,
           parent_phone: formData.parent_phone,
         })
-        .eq("id", profile.id)
+        .eq("id", authProfile.id)
 
       if (error) {
         throw new Error(`Failed to update profile: ${error.message}`)
@@ -169,14 +120,14 @@ export default function ProfilePage() {
   }
 
   const copyStudentId = () => {
-    if (profile?.student_id) {
-      navigator.clipboard.writeText(profile.student_id)
+    if (authProfile?.student_id) {
+      navigator.clipboard.writeText(authProfile.student_id)
       setCodeCopied(true)
       setTimeout(() => setCodeCopied(false), 2000)
     }
   }
 
-  if (loading) {
+  if (!authProfile) {
     return (
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
@@ -213,12 +164,12 @@ export default function ProfilePage() {
             )}
 
             {/* Student ID Display */}
-            {profile?.role === "student" && profile?.student_id && (
+            {authProfile?.role === "student" && authProfile?.student_id && (
               <div className={`mb-6 p-4 ${dynamicAccent.badge.primary} rounded-lg border border-[var(--accent-medium)]`}>
                 <h3 className={`text-sm font-medium ${dynamicAccent.icon.primary} mb-2`}>Your Student ID</h3>
                 <div className="flex items-center">
                   <code className={`bg-white px-3 py-1.5 rounded border border-[var(--accent-medium)] ${dynamicAccent.icon.primary} font-mono text-sm flex-grow`}>
-                    {profile.student_id}
+                    {authProfile.student_id}
                   </code>
                   <button
                     onClick={copyStudentId}
@@ -277,7 +228,7 @@ export default function ProfilePage() {
                   <p className="mt-1 text-xs text-gray-500">Email cannot be changed</p>
                 </div>
 
-                {profile?.role === "student" && (
+                {authProfile?.role === "student" && (
                   <div>
                     <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">
                       Grade
@@ -294,7 +245,7 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {profile?.role === "student" && (
+                {authProfile?.role === "student" && (
                   <>
                     <div>
                       <label htmlFor="parent_email" className="block text-sm font-medium text-gray-700 mb-1">
