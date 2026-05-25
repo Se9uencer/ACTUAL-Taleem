@@ -1,289 +1,72 @@
-"use client"
+import { notFound, redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { parsePacificDateTime, getTomorrowDatePST } from "@/lib/date-utils"
+import { EditAssignmentForm } from "./edit-assignment-form"
 
-import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
-import Link from "next/link"
-import { createClientComponentClient } from "@/lib/supabase/client"
-import { TaleemLogo } from "@/components/taleem-logo"
-import { surahData, getAyahCount, generateAssignmentTitle } from "@/lib/quran-data"
-import AuthenticatedLayout from "@/components/authenticated-layout"
-import { BackButton } from "@/components/ui/back-button"
-import { ArrowLeft, Save } from "lucide-react"
-import { TimePicker } from "@/components/ui/time-picker"
-import { StudentSelector } from "@/components/ui/student-selector"
+export default async function EditAssignmentPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id: assignmentId } = await params
+  const supabase = await createClient()
 
-// Helper function to get all students in a class
-const getAllClassStudents = async (supabase: any, classId: string): Promise<string[]> => {
-  const { data: classStudents, error } = await supabase
-    .from('class_students')
-    .select('student_id')
-    .eq('class_id', classId)
+  // ── Auth guard ─────────────────────────────────────────────────────────────
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect("/login")
 
-  if (error) {
-    console.error('Error fetching class students:', error)
-    return []
-  }
+  // ── Assignment + ownership check ───────────────────────────────────────────
+  const { data: assignment, error } = await supabase
+    .from("assignments")
+    .select("*")
+    .eq("id", assignmentId)
+    .single()
 
-  return classStudents?.map((cs: any) => cs.student_id) || []
-}
+  if (error || !assignment) notFound()
+  if (assignment.teacher_id !== user.id) notFound()
 
-export default function EditAssignmentPage() {
-  const [surahName, setSurahName] = useState("")
-  const [startAyah, setStartAyah] = useState(1)
-  const [endAyah, setEndAyah] = useState(1)
-  const [maxAyah, setMaxAyah] = useState(7)
-  const [dueDate, setDueDate] = useState("")
-  const [dueTime, setDueTime] = useState("")
-  const [classId, setClassId] = useState("")
-  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
-  const [assignToAll, setAssignToAll] = useState(true)
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  
-  const router = useRouter()
-  const params = useParams()
-  const assignmentId = params.id as string
+  // ── Current student list — parallel with class student lookup ──────────────
+  const [assignedResult, classStudentsResult] = await Promise.all([
+    supabase
+      .from("assignment_students")
+      .select("student_id")
+      .eq("assignment_id", assignmentId),
+    supabase
+      .from("class_students")
+      .select("student_id")
+      .eq("class_id", assignment.class_id!)
+      .eq("enrollment_status", "active"),
+  ])
 
-  useEffect(() => {
-    const loadAssignment = async () => {
-      try {
-        const supabase = createClientComponentClient()
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (!sessionData.session) {
-          router.push("/login");
-          return
-        }
-        
-        const { data } = await supabase.from("assignments").select("*").eq("id", assignmentId).single()
-        if (!data) {
-            throw new Error("Assignment not found or you don't have permission to edit it.");
-        }
-        if (data.teacher_id !== sessionData.session.user.id) {
-          throw new Error("You don't have permission to edit this assignment")
-        }
+  const assignedIds = (assignedResult.data ?? []).map((r) => r.student_id)
+  const allClassIds = (classStudentsResult.data ?? []).map((r) => r.student_id)
 
-        setSurahName(data.surah_name as string)
-        setStartAyah(data.start_ayah as number)
-        setEndAyah(data.end_ayah as number)
-        setClassId(data.class_id as string)
-        
-        // Parse the due_date properly to extract date and time in local timezone
-        if (data.due_date) {
-          const dueDateTime = new Date(data.due_date as string)
-          
-          // Extract date in YYYY-MM-DD format
-          const year = dueDateTime.getFullYear()
-          const month = String(dueDateTime.getMonth() + 1).padStart(2, '0')
-          const day = String(dueDateTime.getDate()).padStart(2, '0')
-          setDueDate(`${year}-${month}-${day}`)
-          
-          // Extract time in HH:mm format (24-hour)
-          const hours = String(dueDateTime.getHours()).padStart(2, '0')
-          const minutes = String(dueDateTime.getMinutes()).padStart(2, '0')
-          setDueTime(`${hours}:${minutes}`)
-        }
+  const assignToAll =
+    allClassIds.length > 0 &&
+    allClassIds.length === assignedIds.length &&
+    allClassIds.every((id) => assignedIds.includes(id))
 
-        // Load existing student assignments (always from assignment_students table)
-        const { data: assignmentStudents, error: studentsError } = await supabase
-          .from('assignment_students')
-          .select('student_id')
-          .eq('assignment_id', assignmentId)
-
-        if (studentsError) {
-          console.error('Error loading assignment students:', studentsError)
-        } else {
-          const studentIds = assignmentStudents?.map((as: any) => as.student_id as string) || []
-          setSelectedStudentIds(studentIds)
-          
-          // Get all students in the class to check if all are assigned
-          const allClassStudents = await getAllClassStudents(supabase, data.class_id as string)
-          const allAssigned = allClassStudents.length > 0 && 
-                             allClassStudents.length === studentIds.length &&
-                             allClassStudents.every(id => studentIds.includes(id))
-          setAssignToAll(allAssigned)
-        }
-
-      } catch (err: any) {
-          setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-    if (assignmentId) {
-      loadAssignment()
-    }
-  }, [assignmentId, router])
-
-  useEffect(() => {
-    if (surahName) setMaxAyah(getAyahCount(surahName))
-  }, [surahName])
-
-  const handleStudentSelectionChange = (studentIds: string[], assignToAll: boolean) => {
-    setSelectedStudentIds(studentIds)
-    setAssignToAll(assignToAll)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!dueTime) {
-        setError("Please select a due time.")
-        return
-    }
-    if (!assignToAll && selectedStudentIds.length === 0) {
-      setError("Please select at least one student or choose 'All Students'.");
-      return
-    }
-    setSubmitting(true)
-    setError(null)
-
-    try {
-      const supabase = createClientComponentClient()
-      const title = generateAssignmentTitle(surahName, startAyah, endAyah)
-      // Create a proper Pacific timezone timestamp
-      // Dynamically determine Pacific timezone offset (PDT vs PST)
-      const testDate = new Date(`${dueDate}T${dueTime}:00`)
-      const pacificOffset = testDate.getTimezoneOffset() === 420 ? '-07:00' : '-08:00'
-      const dueDateTime = `${dueDate}T${dueTime}:00${pacificOffset}`
-
-      const { error } = await supabase
-        .from("assignments")
-        .update({
-          title,
-          surah_name: surahName,
-          start_ayah: startAyah,
-          end_ayah: endAyah,
-          due_date: dueDateTime,
-        })
-        .eq("id", assignmentId)
-
-      if (error) throw error
-
-      // Update student assignments (always static assignment list)
-      // First, delete existing assignment-student relationships
-      const { error: deleteError } = await supabase
-        .from("assignment_students")
-        .delete()
-        .eq("assignment_id", assignmentId)
-
-      if (deleteError) {
-        console.error("Error deleting existing student assignments:", deleteError)
-        throw new Error("Failed to update student assignments")
-      }
-
-      // Then create new relationships based on current selection
-      const studentsToAssign = assignToAll ? 
-        // If "All Students" selected, snapshot current students in the class
-        await getAllClassStudents(supabase, classId) : 
-        // Otherwise use specifically selected students
-        selectedStudentIds
-
-      if (studentsToAssign.length > 0) {
-        const assignmentStudentData = studentsToAssign.map((studentId: string) => ({
-          assignment_id: assignmentId,
-          student_id: studentId,
-        }))
-
-        const { error: assignmentStudentsError } = await supabase
-          .from("assignment_students")
-          .insert(assignmentStudentData)
-
-        if (assignmentStudentsError) {
-          console.error("Error creating student assignments:", assignmentStudentsError)
-          throw new Error("Failed to assign students to assignment")
-        }
-      } else {
-        throw new Error("No students available to assign")
-      }
-
-      router.push(`/assignments/${assignmentId}?message=Assignment updated successfully!`)
-    } catch (err: any) {
-        setError(err.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <TaleemLogo className="h-12 w-auto text-purple-600 mb-4" />
-        <p className="text-gray-700 mb-2">Loading assignment...</p>
-      </div>
-    )
-  }
+  // ── Parse stored Pacific timestamp back to wall-clock date + time ──────────
+  // The old edit page used new Date().getHours() which reads the *browser* TZ —
+  // wrong for any teacher outside America/Los_Angeles.  parsePacificDateTime
+  // uses Intl and is correct regardless of server or browser locale.
+  const { date: initialDate, time: initialTime } = assignment.due_date
+    ? parsePacificDateTime(assignment.due_date)
+    : { date: getTomorrowDatePST(), time: "" }
 
   return (
-    <AuthenticatedLayout>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="mb-6">
-            <BackButton href={`/assignments/${assignmentId}`} label="Back to Assignment" className="mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900">Edit Assignment</h1>
-          </div>
-        <div className="bg-white shadow rounded-lg p-6">
-          <form onSubmit={handleSubmit}>
-            {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md"><p>{error}</p></div>}
-            
-            <div className="space-y-4">
-               <div>
-                <label htmlFor="surah" className="block text-sm font-medium text-gray-700">Surah</label>
-                <select id="surah" value={surahName} onChange={(e) => setSurahName(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500" required>
-                  {surahData.map((surah) => (<option key={surah.number} value={surah.name}>{surah.name}</option>))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="startAyah" className="block text-sm font-medium text-gray-700">Start Ayah</label>
-                  <input type="number" id="startAyah" value={startAyah} onChange={(e) => setStartAyah(Number(e.target.value))}
-                    min={1} max={maxAyah} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500" required />
-                </div>
-                <div>
-                  <label htmlFor="endAyah" className="block text-sm font-medium text-gray-700">End Ayah</label>
-                  <input type="number" id="endAyah" value={endAyah} onChange={(e) => setEndAyah(Number(e.target.value))}
-                    min={startAyah} max={maxAyah} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500" required />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">Due Date</label>
-                  <input type="date" id="dueDate" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
-                    className="mt-1 block w-full h-10 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500" required />
-                </div>
-                <div>
-                  <label htmlFor="dueTime" className="block text-sm font-medium text-gray-700">Due Time</label>
-                  <div className="mt-1">
-                    <TimePicker value={dueTime} onChange={setDueTime} placeholder="Select time" className="h-10" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Student Selection */}
-              {classId && (
-                <StudentSelector
-                  classId={classId}
-                  selectedStudentIds={selectedStudentIds}
-                  onSelectionChange={handleStudentSelectionChange}
-                  assignToAll={assignToAll}
-                  disabled={submitting}
-                />
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button type="submit" disabled={submitting || loading}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50">
-                <Save className="mr-2 h-4 w-4" />
-                {submitting ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-          </div>
-        </div>
-      </div>
-    </AuthenticatedLayout>
+    <EditAssignmentForm
+      assignmentId={assignmentId}
+      classId={assignment.class_id!}
+      initialSurahName={assignment.surah_name ?? ""}
+      initialStartAyah={assignment.start_ayah ?? 1}
+      initialEndAyah={assignment.end_ayah ?? 1}
+      initialDate={initialDate}
+      initialTime={initialTime}
+      initialStudentIds={assignedIds}
+      initialAssignToAll={assignToAll}
+    />
   )
-} 
+}

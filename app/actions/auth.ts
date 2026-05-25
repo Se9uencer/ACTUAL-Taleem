@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
 // The syncUserSettings function has been removed as it's redundant

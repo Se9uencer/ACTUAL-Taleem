@@ -12,8 +12,7 @@ declare global {
 export function getBrowserSupabase(): SupabaseClient | undefined {
   if (typeof window === 'undefined') {
     console.warn('[SB] getBrowserSupabase called on server; returning stub')
-    // @ts-expect-error - returning undefined server-side; callers must guard
-    return undefined
+    return undefined as unknown as SupabaseClient
   }
   if (!window.__sbClient) {
     window.__sbClient = createClient(url, key, {

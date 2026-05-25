@@ -4,19 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-
-interface Profile {
-  id: string
-  email: string
-  role: 'teacher' | 'student' | 'parent'
-  first_name?: string
-  last_name?: string
-  school_id?: string
-  grade?: string
-  student_id?: string
-  parent_email?: string
-  parent_phone?: string
-}
+import type { Profile } from '@/types'
 
 interface AuthState {
   user: User | null
@@ -75,34 +63,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Profile query timed out after 5s')), 5000)
-      )
-      const query = supabase.from('profiles').select('*').eq('id', userId).single()
-      const { data: profileData, error: profileError } = await Promise.race([query, timeout])
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
       if (profileError) {
-        console.error('Profile loading error:', profileError)
+        console.error('Profile loading error — code:', profileError.code, 'message:', profileError.message, 'details:', profileError.details)
         return null
       }
 
-      if (!profileData || !profileData.id || !profileData.email || !profileData.role) {
-        console.error('Invalid profile data received:', profileData)
+      if (!profileData) {
+        console.error('Profile query returned no data for userId:', userId)
         return null
       }
 
-      return {
-        id: profileData.id,
-        email: profileData.email,
-        role: profileData.role,
-        first_name: profileData.first_name || undefined,
-        last_name: profileData.last_name || undefined,
-        school_id: profileData.school_id || undefined,
-        grade: profileData.grade || undefined,
-        student_id: profileData.student_id || undefined,
-        parent_email: profileData.parent_email || undefined,
-        parent_phone: profileData.parent_phone || undefined,
-      } as Profile
+      return profileData
     } catch (error) {
       console.error('Failed to load profile:', error)
       return null
@@ -122,24 +99,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Unblock navigation immediately — set user/session without waiting for profile
+    // Build an immediate profile from session metadata so the UI never blocks.
+    // Supabase stores the signup form values in user_metadata, so this is always
+    // available without a database round-trip.
+    const meta = session.user.user_metadata ?? {}
+    const immediateProfile: Profile = {
+      id: session.user.id,
+      email: session.user.email ?? null,
+      role: meta.role ?? null,
+      first_name: meta.first_name ?? null,
+      last_name: meta.last_name ?? null,
+      grade: meta.grade ?? null,
+      parent_email: meta.parent_email ?? null,
+      parent_phone: meta.parent_phone ?? null,
+      school_id: null,
+      student_id: null,
+      theme_accent_color: null,
+      created_at: null,
+    }
+
     setAuthState({
       user: session.user,
-      profile: null,
+      profile: immediateProfile,
       session,
       loading: false,
       error: null,
       initialized: true
     })
 
-    // Load profile in the background — updates state when ready
+    // Load the full DB profile in the background to pick up any server-side
+    // updates (e.g. student_id, school_id, theme colour). Non-critical — the
+    // app is already usable with the metadata profile above.
     try {
-      const profile = await loadProfile(session.user.id)
-      if (profile) {
-        setAuthState(prev => ({ ...prev, profile }))
+      const dbProfile = await loadProfile(session.user.id)
+      if (dbProfile) {
+        setAuthState(prev => ({ ...prev, profile: dbProfile }))
       }
     } catch (error) {
-      console.error('[AuthContext] Error loading profile:', error)
+      console.error('[AuthContext] Background DB profile load failed:', error)
     }
   }, [loadProfile])
 

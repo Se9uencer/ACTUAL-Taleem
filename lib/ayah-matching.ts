@@ -29,7 +29,7 @@ interface MatchResult {
 
 // Load and flatten all ayahs from quran.json
 async function getAllAyahs(): Promise<Ayah[]> {
-  const quranPath = path.resolve(process.cwd(), "quran.json");
+  const quranPath = path.resolve(process.cwd(), "lib/quran.json");
   const raw = await fs.readFile(quranPath, "utf8");
   const quran = JSON.parse(raw);
   const ayahs: Ayah[] = [];
@@ -87,7 +87,7 @@ export async function matchTranscriptionToAyahs({
   });
 
   // 2. Load ayahs
-  const quranPath = path.resolve(process.cwd(), "quran.json");
+  const quranPath = path.resolve(process.cwd(), "lib/quran.json");
   const raw = await fs.readFile(quranPath, "utf8");
   const quran = JSON.parse(raw);
   const allAyahs: Ayah[] = await getAllAyahs();
